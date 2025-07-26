@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "802623602942",
+    "project_id": "furever-healthy-2a1ae",
+    "storage_bucket": "furever-healthy-2a1ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:802623602942:android:29ed4e6154c3c1c8dfe5af",
+        "android_client_info": {
+          "package_name": "com.fureverhealthy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDq_QtR3ZwaRLjd3p4MXze0cPnRx7k5jco"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
