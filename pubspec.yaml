@@ -36,6 +36,8 @@ dependencies:
   shared_preferences: ^2.2.2
   cupertino_icons: ^1.0.8
   intl: ^0.18.1 
+  http: ^0.13.6 # for API calls
+  flutter_dotenv: ^5.0.2
   
 
 dev_dependencies:
@@ -63,6 +65,7 @@ flutter:
   assets:
     - assets/fhlogo.png
     - assets/furever2.png
+    - assets/furever.png
     - assets/facebook.png
     - assets/google.png
     - assets/twitter.png
@@ -73,6 +76,15 @@ flutter:
     - assets/community.png
     - assets/vaccination.png
     - assets/vet.png
+    - assets/golden_retriever.jpeg
+    - assets/puppy.jpeg
+    - assets/dog_walking.jpeg
+    - assets/.env
+    - assets/add_post.png
+    - assets/appoint.png
+    - assets/userprof.png
+    - assets/hmpage.png
+    - assets/guide.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

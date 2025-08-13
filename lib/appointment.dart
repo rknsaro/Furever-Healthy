@@ -1,5 +1,8 @@
+// lib/appointments.dart
+
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Import for date formatting
+import 'package:intl/intl.dart';
+import 'package:fureverhealthy/booking_details_page.dart'; // Import the booking details page
 
 class AppointmentPage extends StatefulWidget {
   const AppointmentPage({super.key});
@@ -9,23 +12,21 @@ class AppointmentPage extends StatefulWidget {
 }
 
 class _AppointmentPageState extends State<AppointmentPage> {
-  DateTime _selectedDate = DateTime.now(); // Default to today's date
+  DateTime _selectedDate = DateTime.now();
   late PageController _datePageController;
 
   @override
   void initState() {
     super.initState();
-    // Initialize _selectedDate to the 8th of May if it's not already May,
-    // or keep it as today if today is in May.
-    final now = DateTime.now();
-    if (now.month != 5 || now.year != 2024) { // Assuming initial target is May 2024
-      _selectedDate = DateTime(2024, 5, 8); // Set to May 8, 2024 for example, adjust year as needed
-    }
-
-    // Calculate initial page for PageController to center around _selectedDate
-    // Assuming 30 days per page (roughly visible range)
-    final int initialPage = (_selectedDate.day - 1) ~/ 7; // Adjust as needed
+    _selectedDate = DateTime.now();
+    final int initialPage = _selectedDate.day - 1;
     _datePageController = PageController(initialPage: initialPage);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_datePageController.hasClients) {
+        _datePageController.jumpToPage(initialPage);
+      }
+    });
   }
 
   @override
@@ -34,20 +35,17 @@ class _AppointmentPageState extends State<AppointmentPage> {
     super.dispose();
   }
 
-  // Helper to get number of days in a month
   int _daysInMonth(int year, int month) {
     return DateTime(year, month + 1, 0).day;
   }
 
   @override
   Widget build(BuildContext context) {
-    // Get the first day of the selected month
     final int daysInSelectedMonth = _daysInMonth(_selectedDate.year, _selectedDate.month);
     final DateTime firstDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
 
     return Scaffold(
       backgroundColor: const Color(0xFFE8F0D6),
-
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,9 +113,8 @@ class _AppointmentPageState extends State<AppointmentPage> {
               color: Colors.white,
               child: Row(
                 children: [
-                  // Month Dropdown
                   Container(
-                    width: 100, // Adjusted width for dropdown
+                    width: 100,
                     margin: const EdgeInsets.symmetric(horizontal: 5),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
@@ -152,7 +149,6 @@ class _AppointmentPageState extends State<AppointmentPage> {
                           if (newMonth != null) {
                             setState(() {
                               _selectedDate = DateTime(_selectedDate.year, newMonth, 1);
-                              // Reset scroll position to beginning of new month
                               _datePageController.jumpToPage(0);
                             });
                           }
@@ -162,15 +158,14 @@ class _AppointmentPageState extends State<AppointmentPage> {
                       ),
                     ),
                   ),
-                  // Date selection ListView
                   Expanded(
                     child: ListView.builder(
                       controller: _datePageController,
                       scrollDirection: Axis.horizontal,
-                      itemCount: daysInSelectedMonth, // Show all days of the selected month
+                      itemCount: daysInSelectedMonth,
                       itemBuilder: (context, index) {
                         final date = firstDayOfMonth.add(Duration(days: index));
-                        final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month;
+                        final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month && date.year == _selectedDate.year;
 
                         return GestureDetector(
                           onTap: () {
@@ -179,26 +174,24 @@ class _AppointmentPageState extends State<AppointmentPage> {
                             });
                           },
                           child: Container(
-                            width: 90, // Adjusted width for date items
+                            width: 90,
                             margin: const EdgeInsets.symmetric(horizontal: 5),
                             decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF61972E)
-                                  : Colors.transparent,
+                              color: isSelected ? const Color(0xFF61972E) : Colors.transparent,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  DateFormat('MMM d').format(date), // e.g., May 1
+                                  DateFormat('MMM d').format(date),
                                   style: TextStyle(
                                     color: isSelected ? Colors.white : Colors.black,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 Text(
-                                  DateFormat('EEE').format(date), // e.g., Mon
+                                  DateFormat('EEE').format(date),
                                   style: TextStyle(
                                     color: isSelected ? Colors.white : Colors.grey,
                                     fontSize: 12,
@@ -221,7 +214,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Available on ${DateFormat('MMM d, yyyy').format(_selectedDate)}', // Dynamically update
+                    'Available on ${DateFormat('MMM d, yyyy').format(_selectedDate)}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -230,24 +223,37 @@ class _AppointmentPageState extends State<AppointmentPage> {
                   ),
                   const SizedBox(height: 15),
                   DoctorCard(
-                    name: 'Dr. Lorem Ipsum',
+                    doctorName: 'Dr. Lucas Strong',
                     specialty: 'Small Animal Specialist',
                     rating: 5,
                     isLicenseVerified: true,
                     profileImageAsset: 'assets/vet.png',
                     availableTimes: const ['2:15 - 2:45 PM', '3:15 - 3:45 PM'],
+                    onBookNow: () {
+                      _navigateToBookingDetails(
+                        doctorName: 'Dr. Lucas Strong',
+                        specialty: 'Small Animal Specialist',
+                        profileImageAsset: 'assets/vet.png',
+                      );
+                    },
                   ),
                   const SizedBox(height: 15),
                   DoctorCard(
-                    name: 'Dr. Lorem Ipsum',
+                    doctorName: 'Dr. Lorem Garcia',
                     specialty: 'Small Animal Specialist',
                     rating: 5,
                     isLicenseVerified: true,
                     profileImageAsset: 'assets/vet.png',
                     availableTimes: const ['10:00 - 10:30 AM', '11:00 - 11:30 AM'],
+                    onBookNow: () {
+                      _navigateToBookingDetails(
+                        doctorName: 'Dr. Lorem Ipsum',
+                        specialty: 'Small Animal Specialist',
+                        profileImageAsset: 'assets/vet.png',
+                      );
+                    },
                   ),
                   const SizedBox(height: 15),
-                  // Add more DoctorCard widgets as needed
                 ],
               ),
             ),
@@ -286,24 +292,44 @@ class _AppointmentPageState extends State<AppointmentPage> {
       ),
     );
   }
+
+  void _navigateToBookingDetails({
+    required String doctorName,
+    required String specialty,
+    required String profileImageAsset,
+  }) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BookingDetailsPage(
+          doctorName: doctorName,
+          specialty: specialty,
+          profileImageAsset: profileImageAsset,
+          selectedDate: DateFormat('MMM d, yyyy').format(_selectedDate), // Pass only the selected date
+        ),
+      ),
+    );
+  }
 }
 
 class DoctorCard extends StatelessWidget {
-  final String name;
+  final String doctorName;
   final String specialty;
   final int rating;
   final bool isLicenseVerified;
   final String profileImageAsset;
   final List<String> availableTimes;
+  final VoidCallback onBookNow; // Changed to VoidCallback as time is selected on next page
 
   const DoctorCard({
     super.key,
-    required this.name,
+    required this.doctorName,
     required this.specialty,
     required this.rating,
     required this.isLicenseVerified,
     required this.profileImageAsset,
     required this.availableTimes,
+    required this.onBookNow,
   });
 
   @override
@@ -344,7 +370,7 @@ class DoctorCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      name,
+                      doctorName,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
@@ -382,6 +408,7 @@ class DoctorCard extends StatelessWidget {
                                   color: Colors.green,
                                   fontSize: 13,
                                 ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -394,6 +421,7 @@ class DoctorCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 15),
+          // Available Times and Book Now Buttons
           Column(
             children: availableTimes.map((time) {
               return Padding(
@@ -410,9 +438,7 @@ class DoctorCard extends StatelessWidget {
                     SizedBox(
                       width: 100,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // Handle book now
-                        },
+                        onPressed: onBookNow, // No longer passing time, just navigating
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF61972E),
                           shape: RoundedRectangleBorder(

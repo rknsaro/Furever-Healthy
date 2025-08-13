@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
-import 'screens/loading_screen.dart'; // Adjust path if needed
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // this is now used
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this line
+import 'firebase_options.dart';
+import 'auth_wrapper.dart'; // Your wrapper for login logic
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: "assets/.env");
+
+  // Initialize Firebase
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // ✅ use the generated config
+    options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(const MyApp());
 }
 
@@ -21,7 +28,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const LoadingScreen(), // Your starting screen
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }

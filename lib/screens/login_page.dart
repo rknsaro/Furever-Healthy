@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'signup_page.dart';
@@ -38,7 +40,7 @@ class _LoginPageState extends State<LoginPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Login Successful!'),
-            backgroundColor: Colors.green,
+            backgroundColor: const Color(0xFF02AF95),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             margin: const EdgeInsets.all(20),
@@ -46,9 +48,9 @@ class _LoginPageState extends State<LoginPage> {
         );
 
         Future.delayed(const Duration(seconds: 1), () {
-          Navigator.pushReplacement(
-            context,
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const HomePage()),
+            (route) => false, // Removes all previous routes
           );
         });
       } on FirebaseAuthException catch (e) {
@@ -82,45 +84,48 @@ class _LoginPageState extends State<LoginPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF6F994A),
-              Color(0xebcf112f15),
+              Color(0xFF07B89D), // Top color
+              Color(0xFF7FF1A9), // Bottom color
             ],
-            stops: [0.5, 1.0],
+            stops: [0.24, 0.63],
           ),
         ),
         child: Center(
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 30.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset('assets/furever2.png', width: 250),
-                    const SizedBox(height: 30),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset('assets/furever.png', width: 120), // Using a new white logo from the image
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Log In',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const Text(
+                    'Hey there! Welcome back',
+                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  ),
+                  const SizedBox(height: 30),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Form(
+                      key: _formKey,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text(
-                            'Welcome back',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 25),
                           const Text('Email', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
                           const SizedBox(height: 8),
                           TextFormField(
@@ -132,6 +137,14 @@ class _LoginPageState extends State<LoginPage> {
                               fillColor: Color(0xFFF0F0F0),
                               border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                               contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(10)),
+                                borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(10)),
+                                borderSide: BorderSide(color: Color(0xFF02AF95), width: 2),
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) return 'Please enter your email';
@@ -151,8 +164,19 @@ class _LoginPageState extends State<LoginPage> {
                               fillColor: const Color(0xFFF0F0F0),
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                              enabledBorder: const OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(10)),
+                                borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+                              ),
+                              focusedBorder: const OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(10)),
+                                borderSide: BorderSide(color: Color(0xFF02AF95), width: 2),
+                              ),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscureText ? Icons.visibility_off : Icons.visibility),
+                                icon: Icon(
+                                  _obscureText ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: () {
                                   setState(() {
                                     _obscureText = !_obscureText;
@@ -172,12 +196,20 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               Row(
                                 children: [
-                                  Checkbox(
-                                    value: _rememberMe,
-                                    onChanged: (value) {
-                                      setState(() => _rememberMe = value ?? false);
-                                    },
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: Checkbox(
+                                      value: _rememberMe,
+                                      onChanged: (value) {
+                                        setState(() => _rememberMe = value ?? false);
+                                      },
+                                      activeColor: const Color(0xFF02AF95),
+                                      checkColor: Colors.white,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
                                   ),
+                                  const SizedBox(width: 8),
                                   const Text('Remember me', style: TextStyle(fontSize: 14)),
                                 ],
                               ),
@@ -185,7 +217,7 @@ class _LoginPageState extends State<LoginPage> {
                                 onPressed: () {
                                   // Add forgot password logic here
                                 },
-                                child: const Text('Forgot Password?', style: TextStyle(fontSize: 14)),
+                                child: const Text('Forgot Password?', style: TextStyle(fontSize: 14, color: Colors.grey)),
                               ),
                             ],
                           ),
@@ -194,15 +226,39 @@ class _LoginPageState extends State<LoginPage> {
                             height: 55,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF112F15),
+                                backgroundColor: const Color(0xFF02AF95),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                                elevation: 0,
                               ),
                               onPressed: _handleLogin,
                               child: const Text(
-                                'Log in',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white), // Set text color to white
+                                'Log In',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 30),
+                          Row(
+                            children: [
+                              const Expanded(child: Divider(thickness: 1, color: Color(0xFFE0E0E0))),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                child: Text(
+                                  'Or sign up with',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                ),
+                              ),
+                              const Expanded(child: Divider(thickness: 1, color: Color(0xFFE0E0E0))),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Image.asset('assets/facebook.png', width: 40, height: 40),
+                              Image.asset('assets/google.png', width: 40, height: 40),
+                              Image.asset('assets/twitter.png', width: 40, height: 40),
+                            ],
                           ),
                           const SizedBox(height: 30),
                           Row(
@@ -211,20 +267,14 @@ class _LoginPageState extends State<LoginPage> {
                               const Text("Don't have an Account? "),
                               GestureDetector(
                                 onTap: () async {
-                                  // ignore: unused_local_variable
                                   final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(builder: (context) => const SignupPage()),
                                   );
-                                  // Removed automatic pre-filling of email/password
-                                  // if (result != null && result is Map<String, String>) {
-                                  //   _emailController.text = result['email'] ?? '';
-                                  //   _passwordController.text = result['password'] ?? '';
-                                  // }
                                 },
                                 child: const Text(
                                   'Sign up.',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6F994A)),
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF02AF95)),
                                 ),
                               ),
                             ],
@@ -232,8 +282,8 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

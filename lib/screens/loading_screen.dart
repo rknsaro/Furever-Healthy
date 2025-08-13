@@ -16,10 +16,10 @@ class LoadingScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF6F994A), // 6F994A - stops at 50% (opacity 100)
-              Color(0xebcf112f15), // 112F15 - stops at 100% (opacity 92)
+              Color(0xFF07B89D), // Top color from Figma guide
+              Color(0xFF7FF1A9), // Bottom color from Figma guide
             ],
-            stops: [0.5, 1.0],
+            stops: [0.24, 0.63], // Stop percentages from Figma guide
           ),
         ),
         child: Center(
