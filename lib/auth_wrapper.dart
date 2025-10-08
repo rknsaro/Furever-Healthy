@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'screens/loading_screen.dart';  // Your welcome/loading screen
-import 'screens/login_page.dart';
 import '../home_page.dart';     // Adjust path if needed
 
 class AuthWrapper extends StatelessWidget {

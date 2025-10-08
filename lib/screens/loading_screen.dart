@@ -1,14 +1,11 @@
-// lib/screens/loading_screen.dart
 import 'package:flutter/material.dart';
-import 'login_page.dart'; // Adjust this import path as needed
+import 'login_page.dart';
 
 class LoadingScreen extends StatelessWidget {
   const LoadingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Removed screenHeight, screenWidth, baseDesignWidth, and scaleFactor
-
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -16,65 +13,75 @@ class LoadingScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF07B89D), // Top color from Figma guide
-              Color(0xFF7FF1A9), // Bottom color from Figma guide
+              Color(0xFF6F994A), // Adjusted top color
+              Color(0xFF112F15), // Adjusted bottom color
             ],
-            stops: [0.24, 0.63], // Stop percentages from Figma guide
+            stops: [0.5, 1.0],
           ),
         ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Spacer to push the logo up
+              const Spacer(flex: 3),
+
               // Logo
-              // Using fhlogo.png from previous context, set to a fixed size
               Image.asset(
-                'assets/fhlogo.png',
-                width: 200, // Fixed size
-                height: 200, // Fixed size
+                'assets/fhlogo.png', // Assuming you have an image with this filename
+                height: 250,
               ),
 
-              const SizedBox(height: 50), // Fixed spacing
+              // Spacer to push the button down
+              const Spacer(flex: 2),
 
               // Get Started Button
-              ElevatedButton(
-                onPressed: () {
-                  // Direct navigation to LoginPage widget
+              GestureDetector(
+                onTap: () {
+                  // Navigate to the LoginPage
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    MaterialPageRoute(
+                        builder: (context) => const LoginPage()),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white, // Button background color
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40, // Fixed horizontal padding
-                    vertical: 15, // Fixed vertical padding
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30), // Fixed border radius
-                  ),
-                ),
-                child: const Row( // Made const as all its children are now const or literals
-                  mainAxisSize: MainAxisSize.min,
+                child: Column(
                   children: [
-                    Text(
-                      'Get Started',
-                      style: TextStyle(
-                        fontSize: 18, // Fixed font size
-                        color: Colors.black, // Text color
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward,
+                        color: Color(0xFF112F15),
+                        size: 35,
                       ),
                     ),
-                    SizedBox(width: 10), // Fixed gap
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      color: Colors.black, // Icon color
-                      size: 18, // Fixed icon size
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Get Started',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               ),
+
+              // Spacer for bottom padding
+              const Spacer(flex: 1),
             ],
           ),
         ),

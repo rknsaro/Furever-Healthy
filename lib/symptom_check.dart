@@ -60,7 +60,7 @@ class _SymptomCheckPageState extends State<SymptomCheckPage> {
       backgroundColor: const Color(0xFFE8F0D6),
       appBar: AppBar(
         toolbarHeight: 60,
-        backgroundColor: const Color(0xFF61972E),
+        backgroundColor: const Color(0xFF6F994A),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
@@ -182,7 +182,7 @@ class _SymptomCheckPageState extends State<SymptomCheckPage> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.add, color: Color(0xFF61972E), size: 30),
+                    icon: const Icon(Icons.add, color: Color(0xFF6F994A), size: 30),
                     onPressed: () {
                       print('Add button tapped!');
                     },
@@ -210,7 +210,7 @@ class _SymptomCheckPageState extends State<SymptomCheckPage> {
                       width: 50,
                       height: 50,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF61972E),
+                        color: Color(0xFF6F994A),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.send, color: Colors.white),
@@ -235,7 +235,7 @@ class _SymptomCheckPageState extends State<SymptomCheckPage> {
             color: isSelected ? Colors.white : Colors.black87,
           ),
         ),
-        backgroundColor: isSelected ? const Color(0xFF61972E) : const Color(0xFFD6DDF0),
+        backgroundColor: isSelected ? const Color(0xFF6F994A) : const Color(0xFFD6DDF0),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),

@@ -38,6 +38,10 @@ dependencies:
   intl: ^0.18.1 
   http: ^0.13.6 # for API calls
   flutter_dotenv: ^5.0.2
+  image_picker: ^1.1.2
+  google_sign_in: ^6.1.5
+  flutter_facebook_auth: ^6.0.3
+  twitter_login: ^4.3.0
   
 
 dev_dependencies:
@@ -71,9 +75,8 @@ flutter:
     - assets/twitter.png
     - assets/cat.png
     - assets/dog.png
-    - assets/feeding.png
-    - assets/grooming.png
-    - assets/community.png
+    # - assets/feeding.png
+    # - assets/community.png
     - assets/vaccination.png
     - assets/vet.png
     - assets/golden_retriever.jpeg
@@ -85,6 +88,13 @@ flutter:
     - assets/userprof.png
     - assets/hmpage.png
     - assets/guide.png
+    - assets/pawscomm.png
+    - assets/groom.png
+    - assets/feed.png
+    - assets/medications.png
+    - assets/settings.png
+    - assets/upload.png
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:

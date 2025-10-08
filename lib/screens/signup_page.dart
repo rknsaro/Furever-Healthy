@@ -99,10 +99,10 @@ class _SignupPageState extends State<SignupPage> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF07B89D), // Top color from Figma guide
-              Color(0xFF7FF1A9), // Bottom color from Figma guide
+              Color(0xFF6F994A),
+              Color(0xFF112F15), 
             ],
-            stops: [0.24, 0.63], // Stop percentages from Figma guide
+            stops: [0.5, 1.0],
           ),
         ),
         child: Center(
@@ -161,7 +161,7 @@ class _SignupPageState extends State<SignupPage> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFF02AF95), width: 2),
+                                borderSide: BorderSide(color: Color(0xFF112F15), width: 2),
                               ),
                             ),
                             validator: (value) =>
@@ -186,7 +186,7 @@ class _SignupPageState extends State<SignupPage> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFF02AF95), width: 2),
+                                borderSide: BorderSide(color: Color(0xFF112F15), width: 2),
                               ),
                             ),
                             validator: (value) {
@@ -218,7 +218,7 @@ class _SignupPageState extends State<SignupPage> {
                               ),
                               focusedBorder: const OutlineInputBorder(
                                 borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFF02AF95), width: 2),
+                                borderSide: BorderSide(color: Color(0xFF112F15), width: 2),
                               ),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -257,7 +257,7 @@ class _SignupPageState extends State<SignupPage> {
                               ),
                               focusedBorder: const OutlineInputBorder(
                                 borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFF02AF95), width: 2),
+                                borderSide: BorderSide(color: Color(0xFF112F15), width: 2),
                               ),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -283,7 +283,7 @@ class _SignupPageState extends State<SignupPage> {
                             height: 55,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF02AF95),
+                                backgroundColor: const Color(0xFF112F15),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
                                 elevation: 0,
                               ),
@@ -304,7 +304,7 @@ class _SignupPageState extends State<SignupPage> {
                                 onTap: () => Navigator.pop(context),
                                 child: const Text(
                                   'Login.',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF02AF95), fontSize: 14),
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF112F15), fontSize: 14),
                                 ),
                               ),
                             ],
