@@ -5,17 +5,21 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class GeminiService {
   static final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
-  static const String _apiUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+  // ✅ Use the v1 endpoint and your supported model
+  static const String _baseUrl =
+      'https://generativelanguage.googleapis.com/v1';
+  static String _model = 'gemini-2.5-flash'; // <-- updated model
 
   static Future<String> getAIResponse(String userMessage) async {
     if (_apiKey.isEmpty) {
       return 'API key is missing. Please check your .env file.';
     }
 
+    final url = '$_baseUrl/models/$_model:generateContent?key=$_apiKey';
+
     try {
       final response = await http.post(
-        Uri.parse('$_apiUrl?key=$_apiKey'),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           "contents": [

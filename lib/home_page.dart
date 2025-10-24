@@ -9,6 +9,7 @@ import 'package:fureverhealthy/symptom_check.dart';
 // import 'package:fureverhealthy/quick_actions/community.dart';
 import 'package:fureverhealthy/quick_actions/quick_actions_panel.dart';
 import 'package:fureverhealthy/my_pets/add_new_pet.dart'; // This is the new import
+import 'package:fureverhealthy/my_pets/all_pets.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -177,24 +178,32 @@ class HomeTab extends StatelessWidget {
 
             // MY PETS
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'My Pets',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'All',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w700,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'My Pets',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              TextButton(
+                // MODIFIED: Add navigation here
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AllPetsPage(), // <--- USE AllPetsPage
                     ),
+                  );
+                },
+                child: const Text(
+                  'All',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
 
             // round avatars
             SizedBox(

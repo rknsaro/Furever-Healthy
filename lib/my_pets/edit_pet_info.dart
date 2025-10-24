@@ -43,6 +43,10 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
     'Beagle',
     'Bulldog',
     'Poodle',
+    'Shih Tzu',
+    'Chihuahua',
+    'Siberian Husky',
+    'Corgi',
   ];
 
   final List<String> _catBreeds = [
@@ -53,12 +57,15 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
     'British Shorthair',
     'Bengal',
     'Sphynx',
+    'Abyssinian',
+    'Scottish Fold',
+    'Russian Blue',
   ];
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile =
-        await picker.pickImage(source: ImageSource.gallery); // gallery only
+        await picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _petImage = File(pickedFile.path);
@@ -165,7 +172,7 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                           children: [
                             const SizedBox(height: 24),
 
-                            // Pet Photo with border
+                            // Pet Photo
                             Center(
                               child: Container(
                                 width: 220,
@@ -185,11 +192,8 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                   backgroundColor: _mint,
                                   backgroundImage: imageProvider,
                                   child: imageProvider == null
-                                      ? const Icon(
-                                          Icons.pets,
-                                          color: Colors.white,
-                                          size: 120,
-                                        )
+                                      ? const Icon(Icons.pets,
+                                          color: Colors.white, size: 120)
                                       : null,
                                 ),
                               ),
@@ -220,28 +224,30 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                             ),
                             const SizedBox(height: 30),
 
-                            // Breed Selection
+                            // Breed Selection (Dropdown + Identify Breed)
                             Row(
                               children: [
                                 Expanded(
                                   child: Container(
                                     height: 50,
+                                    padding:
+                                        const EdgeInsets.symmetric(horizontal: 16),
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFF7F7FB),
                                       border: Border.all(color: _mint),
                                       borderRadius: BorderRadius.circular(25),
                                     ),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
                                     child: DropdownButtonHideUnderline(
                                       child: DropdownButton<String>(
                                         value: _selectedBreed,
                                         hint: Text(
                                           "${petName}'s breed is",
                                           style: const TextStyle(
-                                              color: Colors.black54,
-                                              fontWeight: FontWeight.w500),
+                                            color: Colors.black54,
+                                            fontWeight: FontWeight.w500,
+                                          ),
                                         ),
+                                        isExpanded: true,
                                         items: breeds
                                             .map((b) => DropdownMenuItem(
                                                   value: b,
@@ -258,20 +264,30 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                ElevatedButton.icon(
-                                  onPressed: () {},
-                                  icon: const Icon(Icons.camera_alt_rounded,
-                                      color: Colors.white, size: 18),
-                                  label: const Text(
-                                    "Identify Breed",
-                                    style: TextStyle(color: Colors.white),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _mint,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(25),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 50,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              "Breed identification feature coming soon!"),
+                                        ));
+                                      },
+                                      icon: const Icon(Icons.camera_alt_rounded,
+                                          color: Colors.white, size: 18),
+                                      label: const Text(
+                                        "Identify Breed",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _mint,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(25),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -306,7 +322,7 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                             ),
                             const SizedBox(height: 24),
 
-                            // Height & Weight Fields
+                            // Height & Weight
                             Row(
                               children: [
                                 Expanded(
@@ -317,6 +333,9 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                       prefixIcon: const Icon(
                                           Icons.straighten_rounded,
                                           color: Colors.grey),
+                                      suffixText: "cm",
+                                      suffixStyle:
+                                          const TextStyle(color: Colors.grey),
                                       filled: true,
                                       fillColor: const Color(0xFFF7F7FB),
                                       border: OutlineInputBorder(
@@ -337,6 +356,9 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                       prefixIcon: const Icon(
                                           Icons.monitor_weight_rounded,
                                           color: Colors.grey),
+                                      suffixText: "kg",
+                                      suffixStyle:
+                                          const TextStyle(color: Colors.grey),
                                       filled: true,
                                       fillColor: const Color(0xFFF7F7FB),
                                       border: OutlineInputBorder(
