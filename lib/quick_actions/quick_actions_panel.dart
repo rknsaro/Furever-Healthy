@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fureverhealthy/quick_actions/community.dart';
+import 'package:fureverhealthy/quick_actions/community/community.dart';
 import 'package:fureverhealthy/quick_actions/feeding.dart';
 import 'package:fureverhealthy/quick_actions/grooming.dart';
 import 'package:fureverhealthy/quick_actions/medications.dart';

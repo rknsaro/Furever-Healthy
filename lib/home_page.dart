@@ -10,6 +10,7 @@ import 'package:fureverhealthy/symptom_check.dart';
 import 'package:fureverhealthy/quick_actions/quick_actions_panel.dart';
 import 'package:fureverhealthy/my_pets/add_new_pet.dart'; // This is the new import
 import 'package:fureverhealthy/my_pets/all_pets.dart';
+import 'package:fureverhealthy/identify_breed.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -150,7 +151,14 @@ class HomeTab extends StatelessWidget {
                         child: _FilledPillButton(
                           icon: Icons.camera_alt,
                           label: 'Identify Breed',
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const IdentifyBreedScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(width: 10),

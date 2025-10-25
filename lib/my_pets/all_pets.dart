@@ -42,33 +42,28 @@ class _AllPetsPageState extends State<AllPetsPage> with SingleTickerProviderStat
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar with logo and icons
+              // Top bar with back button and centered "My Pets"
               Padding(
                 padding: EdgeInsets.only(top: statusBarHeight + 4, left: 8, right: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 26),
-                      onPressed: () => Navigator.pop(context),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 26),
+                        onPressed: () => Navigator.pop(context),
+                      ),
                     ),
-                    Row(
-                      children: [
-                        Image.asset('assets/furever.png', height: 28),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Furever Healthy',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                    const Center(
+                      child: Text(
+                        'My Pets',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
                         ),
-                      ],
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_none, color: Colors.white, size: 26),
-                      onPressed: () {},
+                      ),
                     ),
                   ],
                 ),
