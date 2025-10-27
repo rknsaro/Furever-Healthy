@@ -103,8 +103,8 @@ class _AllPetsPageState extends State<AllPetsPage> with SingleTickerProviderStat
                         children: [
                           _PetCircle(name: 'Spencer', imagePath: 'assets/dog.png'),
                           const SizedBox(width: 12),
-                          _PetCircle(name: 'Luna', imagePath: 'assets/cat.png'),
-                          const SizedBox(width: 12),
+                          // _PetCircle(name: 'Luna', imagePath: 'assets/cat.png'),
+                          // const SizedBox(width: 12),
                           _AddCircle(
                             onTap: () => Navigator.push(
                               context,
@@ -155,24 +155,19 @@ class _AllPetsPageState extends State<AllPetsPage> with SingleTickerProviderStat
                   child: TabBarView(
                     controller: _tabController,
                     children: const [
+                      // Profile Tab
                       Center(
                         child: Text(
                           'All Pet Profiles List Here',
                           style: TextStyle(color: Colors.black54),
                         ),
                       ),
-                      Center(
-                        child: Text(
-                          'All Pet Appointments Here',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      ),
-                      Center(
-                        child: Text(
-                          'All Pet Reminders Here',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      ),
+
+                      // Appointments Tab (Updated)
+                      _AppointmentsTab(),
+
+                      // Reminders Tab (New)
+                      _RemindersTab(),
                     ],
                   ),
                 ),
@@ -180,6 +175,100 @@ class _AllPetsPageState extends State<AllPetsPage> with SingleTickerProviderStat
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Appointments Tab UI
+class _AppointmentsTab extends StatelessWidget {
+  const _AppointmentsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return _EmptyStateWidget(
+      iconPath: 'assets/schedule.png',
+      message: 'No vet appointment scheduled yet.',
+      buttonText: 'Add appointment',
+      onPressed: () {
+        // Add appointment logic here
+      },
+    );
+  }
+}
+
+// Reminders Tab UI
+class _RemindersTab extends StatelessWidget {
+  const _RemindersTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return _EmptyStateWidget(
+      iconPath: 'assets/schedule.png',
+      message: 'No reminders for now. Want to set one up?',
+      buttonText: 'Add reminder',
+      onPressed: () {
+        // Add reminder logic here
+      },
+    );
+  }
+}
+
+// Reusable empty state widget (for appointments & reminders)
+class _EmptyStateWidget extends StatelessWidget {
+  final String iconPath;
+  final String message;
+  final String buttonText;
+  final VoidCallback onPressed;
+
+  const _EmptyStateWidget({
+    required this.iconPath,
+    required this.message,
+    required this.buttonText,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            iconPath,
+            width: 80,
+            height: 80,
+            color: _mint,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _mint,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: Text(
+              buttonText,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -201,7 +290,7 @@ class _PetCircle extends StatelessWidget {
           height: 60,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Color(0xFFA9C88C),
+            color: Color(0xBFB9E591),
           ),
           child: Padding(
             padding: const EdgeInsets.all(10),

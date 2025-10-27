@@ -96,6 +96,7 @@ flutter:
     - assets/medications.png
     - assets/settings.png
     - assets/upload.png
+    - assets/schedule.png
 
 
   # To add assets to your application, add an assets section, like this:
