@@ -72,44 +72,44 @@ class _CommunityPageState extends State<CommunityPage> with SingleTickerProvider
                 ),
               ),
 
-              const SizedBox(height: 10),
+              // const SizedBox(height: 10),
 
               // Header card
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Image.asset('assets/pawscomm.png', height: 35),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Connect with others, share your stories, and grow together in one friendly space.',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // Padding(
+              //   padding: const EdgeInsets.symmetric(horizontal: 16),
+              //   child: Container(
+              //     padding: const EdgeInsets.all(16),
+              //     decoration: BoxDecoration(
+              //       color: Colors.white,
+              //       borderRadius: BorderRadius.circular(16),
+              //       boxShadow: [
+              //         BoxShadow(
+              //           color: Colors.black.withOpacity(0.15),
+              //           blurRadius: 8,
+              //           offset: const Offset(0, 3),
+              //         ),
+              //       ],
+              //     ),
+              //     child: Row(
+              //       children: [
+              //         Image.asset('assets/pawscomm.png', height: 35),
+              //         const SizedBox(width: 12),
+              //         const Expanded(
+              //           child: Text(
+              //             'Connect with others, share your stories, and grow together in one friendly space.',
+              //             style: TextStyle(
+              //               fontSize: 15,
+              //               fontWeight: FontWeight.w600,
+              //               color: Colors.black87,
+              //             ),
+              //           ),
+              //         ),
+              //       ],
+              //     ),
+              //   ),
+              // ),
 
-              const SizedBox(height: 12),
+              // const SizedBox(height: 12),
 
               // Tabs
               Container(

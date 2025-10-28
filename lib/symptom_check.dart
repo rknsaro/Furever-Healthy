@@ -268,12 +268,12 @@ class _SymptomCheckPageState extends State<SymptomCheckPage> {
             child: SafeArea(
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add, color: Color(0xFF6F994A), size: 30),
-                    onPressed: () {
-                      print('Add button tapped!');
-                    },
-                  ),
+                  // IconButton(
+                  //   icon: const Icon(Icons.add, color: Color(0xFF6F994A), size: 30),
+                  //   onPressed: () {
+                  //     print('Add button tapped!');
+                  //   },
+                  // ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(

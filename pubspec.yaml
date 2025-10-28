@@ -97,6 +97,7 @@ flutter:
     - assets/settings.png
     - assets/upload.png
     - assets/schedule.png
+    - assets/reminders.png
 
 
   # To add assets to your application, add an assets section, like this:
