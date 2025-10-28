@@ -45,7 +45,7 @@ Future<PickedFileData?> pickImageBytes() {
         input.remove();
         return;
       }
-      final bytes = (result as ByteBuffer).asUint8List();
+      final bytes = (result).asUint8List();
       completer.complete(PickedFileData(bytes, file.name));
       input.remove();
     });

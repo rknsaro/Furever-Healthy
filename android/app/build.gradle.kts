@@ -39,3 +39,17 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    
+    // Firebase Analytics
+    implementation("com.google.firebase:firebase-analytics")
+    
+    // Firebase Firestore
+    implementation("com.google.firebase:firebase-firestore")
+    
+    // Firebase Auth
+    implementation("com.google.firebase:firebase-auth")
+}
