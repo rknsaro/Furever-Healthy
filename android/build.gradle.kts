@@ -24,6 +24,6 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.google.gms:google-services:4.4.4") // Updated version
+        classpath("com.google.gms:google-services:4.4.0") // ✅ Kotlin syntax
     }
 }
