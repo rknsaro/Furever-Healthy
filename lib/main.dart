@@ -4,6 +4,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this line
 import 'firebase_options.dart';
 import 'auth_wrapper.dart'; // Your wrapper for login logic
 
+// Updated by HFCapistrano - Firebase integration complete
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
