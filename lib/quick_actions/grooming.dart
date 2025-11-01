@@ -155,7 +155,7 @@ class _GroomingPageState extends State<GroomingPage> {
           Center(
             child: Column(
               children: [
-                Image.asset('assets/schedule.png', width: 40, height: 40, color: _mint),
+                Image.asset('assets/pet_grooming.png', width: 40, height: 40, color: _mint),
                 const SizedBox(height: 10),
                 Text(
                   description,

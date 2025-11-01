@@ -154,7 +154,7 @@ class _FeedingPageState extends State<FeedingPage> {
           Center(
             child: Column(
               children: [
-                Image.asset('assets/schedule.png',
+                Image.asset('assets/pet_feeding.png',
                     width: 40, height: 40, color: _mint),
                 const SizedBox(height: 10),
                 Text(

@@ -1,8 +1,9 @@
-// lib/appointments.dart
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:fureverhealthy/booking_details_page.dart'; // Import the booking details page
+import 'package:fureverhealthy/book_appointment.dart';
+
+const _mint = Color(0xFF6F994A);
+const _mintDark = Color(0xFF112F15);
+const _screenBg = Color(0xFFF6F8FB);
 
 class AppointmentPage extends StatefulWidget {
   const AppointmentPage({super.key});
@@ -12,452 +13,400 @@ class AppointmentPage extends StatefulWidget {
 }
 
 class _AppointmentPageState extends State<AppointmentPage> {
-  DateTime _selectedDate = DateTime.now();
-  late PageController _datePageController;
+  String? selectedFilterType;
+  String? selectedFilterValue;
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedDate = DateTime.now();
-    final int initialPage = _selectedDate.day - 1;
-    _datePageController = PageController(initialPage: initialPage);
+  final List<String> filters = ['Location', 'Specialty', 'Rating'];
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_datePageController.hasClients) {
-        _datePageController.jumpToPage(initialPage);
+  // Available filter options for each filter type
+  final Map<String, List<String>> filterOptions = {
+    'Location': ['Quezon City', 'Manila', 'Makati', 'Pasig', 'Taguig'],
+    'Specialty': [
+      'Small Animal Specialist',
+      'Surgery Specialist',
+      'Emergency Care',
+      'Dental Specialist',
+      'Dermatology',
+    ],
+    'Rating': ['5 Stars', '4 Stars', '3 Stars'],
+  };
+
+  final List<Map<String, dynamic>> allVets = [
+    {
+      'name': 'Dr. Lorem Ipsum',
+      'specialty': 'Small Animal Specialist',
+      'rating': 5,
+      'location': 'Quezon City',
+      'verified': true,
+    },
+    {
+      'name': 'Dr. Jack Doe',
+      'specialty': 'Surgery Specialist',
+      'rating': 5,
+      'location': 'Manila',
+      'verified': true,
+    },
+    {
+      'name': 'Dr. Jane Smith',
+      'specialty': 'Emergency Care',
+      'rating': 4,
+      'location': 'Makati',
+      'verified': true,
+    },
+    {
+      'name': 'Dr. Maria Santos',
+      'specialty': 'Dental Specialist',
+      'rating': 5,
+      'location': 'Pasig',
+      'verified': true,
+    },
+    {
+      'name': 'Dr. John Cruz',
+      'specialty': 'Small Animal Specialist',
+      'rating': 4,
+      'location': 'Taguig',
+      'verified': true,
+    },
+  ];
+
+  List<Map<String, dynamic>> get filteredVets {
+    if (selectedFilterType == null || selectedFilterValue == null) {
+      return allVets;
+    }
+
+    return allVets.where((vet) {
+      switch (selectedFilterType) {
+        case 'Location':
+          return vet['location'] == selectedFilterValue;
+        case 'Specialty':
+          return vet['specialty'] == selectedFilterValue;
+        case 'Rating':
+          int filterRating = int.parse(selectedFilterValue!.split(' ')[0]);
+          return vet['rating'] == filterRating;
+        default:
+          return true;
       }
-    });
-  }
-
-  @override
-  void dispose() {
-    _datePageController.dispose();
-    super.dispose();
-  }
-
-  int _daysInMonth(int year, int month) {
-    return DateTime(year, month + 1, 0).day;
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final int daysInSelectedMonth = _daysInMonth(_selectedDate.year, _selectedDate.month);
-    final DateTime firstDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
-
     return Scaffold(
-      backgroundColor: const Color(0xFFE8F0D6),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: _screenBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Book an appointment',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: _mintDark,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Filters Section
+              Row(
                 children: [
-                  const Text(
-                    'Book an appointment',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    'Filters',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildFilterButton('Location', isSelected: true),
-                      _buildFilterButton('Specialty'),
-                      _buildFilterButton('Rating'),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.shade300),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              blurRadius: 5,
-                              spreadRadius: 1,
-                              offset: const Offset(0, 3),
+                  ...filters.map(
+                    (filter) => Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: GestureDetector(
+                        onTap: () => _showFilterDialog(filter),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selectedFilterType == filter
+                                ? _mint
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: selectedFilterType == filter
+                                  ? _mint
+                                  : Colors.grey.shade400,
                             ),
-                          ],
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Text(
+                            filter,
+                            style: TextStyle(
+                              color: selectedFilterType == filter
+                                  ? Colors.white
+                                  : Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
-                        child: IconButton(
-                          icon: const Icon(Icons.filter_list, color: Colors.grey),
-                          onPressed: () {
-                            // Handle filter icon tap
-                          },
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(),
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (selectedFilterType != null)
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedFilterType = null;
+                          selectedFilterValue = null;
+                        });
+                      },
+                      child: const Icon(Icons.clear, color: Colors.red),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Show selected filter value
+              if (selectedFilterValue != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _mint.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$selectedFilterType: $selectedFilterValue',
+                        style: const TextStyle(
+                          color: _mintDark,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ],
+                ),
+              const SizedBox(height: 20),
+
+              Text(
+                filteredVets.isEmpty
+                    ? 'No vets found'
+                    : 'Available Veterinarians (${filteredVets.length})',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: _mintDark,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              height: 60,
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Container(
-                    width: 100,
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.1),
-                          blurRadius: 5,
-                          spreadRadius: 1,
-                          offset: const Offset(0, 3),
+              const SizedBox(height: 12),
+
+              // Vet Cards
+              if (filteredVets.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No veterinarians match your filter',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: _selectedDate.month,
-                        icon: const Icon(Icons.arrow_drop_down, color: Colors.black),
-                        items: List.generate(12, (index) {
-                          final month = index + 1;
-                          final monthName = DateFormat('MMM').format(DateTime(2024, month));
-                          return DropdownMenuItem<int>(
-                            value: month,
-                            child: Text(
-                              monthName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          );
-                        }),
-                        onChanged: (int? newMonth) {
-                          if (newMonth != null) {
-                            setState(() {
-                              _selectedDate = DateTime(_selectedDate.year, newMonth, 1);
-                              _datePageController.jumpToPage(0);
-                            });
-                          }
-                        },
-                        style: const TextStyle(color: Colors.black),
-                        isExpanded: true,
-                      ),
-                    ),
                   ),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: _datePageController,
-                      scrollDirection: Axis.horizontal,
-                      itemCount: daysInSelectedMonth,
-                      itemBuilder: (context, index) {
-                        final date = firstDayOfMonth.add(Duration(days: index));
-                        final isSelected = date.day == _selectedDate.day && date.month == _selectedDate.month && date.year == _selectedDate.year;
+                )
+              else
+                ...filteredVets.map(
+                  (vet) => _doctorCard(
+                    vet['name'],
+                    vet['specialty'],
+                    vet['rating'],
+                    vet['location'],
+                  ),
+                ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedDate = date;
-                            });
-                          },
-                          child: Container(
-                            width: 90,
-                            margin: const EdgeInsets.symmetric(horizontal: 5),
-                            decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFF61972E) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  DateFormat('MMM d').format(date),
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  DateFormat('EEE').format(date),
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+  void _showFilterDialog(String filterType) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Select $filterType'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: filterOptions[filterType]!.map((option) {
+                return ListTile(
+                  title: Text(option),
+                  onTap: () {
+                    setState(() {
+                      selectedFilterType = filterType;
+                      selectedFilterValue = option;
+                    });
+                    Navigator.pop(context);
+                  },
+                  selected: selectedFilterValue == option,
+                  selectedTileColor: _mint.withOpacity(0.1),
+                );
+              }).toList(),
             ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Available on ${DateFormat('MMM d, yyyy').format(_selectedDate)}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  DoctorCard(
-                    doctorName: 'Dr. Lucas Strong',
-                    specialty: 'Small Animal Specialist',
-                    rating: 5,
-                    isLicenseVerified: true,
-                    profileImageAsset: 'assets/vet.png',
-                    availableTimes: const ['2:15 - 2:45 PM', '3:15 - 3:45 PM'],
-                    onBookNow: () {
-                      _navigateToBookingDetails(
-                        doctorName: 'Dr. Lucas Strong',
-                        specialty: 'Small Animal Specialist',
-                        profileImageAsset: 'assets/vet.png',
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 15),
-                  DoctorCard(
-                    doctorName: 'Dr. Lorem Garcia',
-                    specialty: 'Small Animal Specialist',
-                    rating: 5,
-                    isLicenseVerified: true,
-                    profileImageAsset: 'assets/vet.png',
-                    availableTimes: const ['10:00 - 10:30 AM', '11:00 - 11:30 AM'],
-                    onBookNow: () {
-                      _navigateToBookingDetails(
-                        doctorName: 'Dr. Lorem Ipsum',
-                        specialty: 'Small Animal Specialist',
-                        profileImageAsset: 'assets/vet.png',
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 15),
-                ],
-              ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 20),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildFilterButton(String text, {bool isSelected = false}) {
+  Widget _doctorCard(
+    String name,
+    String specialty,
+    int rating,
+    String location,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF61972E) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSelected ? const Color(0xFF61972E) : Colors.grey.shade300,
-        ),
-        boxShadow: [
-          if (!isSelected)
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 5,
-              spreadRadius: 1,
-              offset: const Offset(0, 3),
-            ),
-        ],
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-
-  void _navigateToBookingDetails({
-    required String doctorName,
-    required String specialty,
-    required String profileImageAsset,
-  }) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BookingDetailsPage(
-          doctorName: doctorName,
-          specialty: specialty,
-          profileImageAsset: profileImageAsset,
-          selectedDate: DateFormat('MMM d, yyyy').format(_selectedDate), // Pass only the selected date
-        ),
-      ),
-    );
-  }
-}
-
-class DoctorCard extends StatelessWidget {
-  final String doctorName;
-  final String specialty;
-  final int rating;
-  final bool isLicenseVerified;
-  final String profileImageAsset;
-  final List<String> availableTimes;
-  final VoidCallback onBookNow; // Changed to VoidCallback as time is selected on next page
-
-  const DoctorCard({
-    super.key,
-    required this.doctorName,
-    required this.specialty,
-    required this.rating,
-    required this.isLicenseVerified,
-    required this.profileImageAsset,
-    required this.availableTimes,
-    required this.onBookNow,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 5,
-            spreadRadius: 1,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
             offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: const Color(0xFFE8F0D6),
-                child: Image.asset(
-                  profileImageAsset,
-                  width: 40,
-                  height: 40,
-                  color: const Color(0xFF61972E),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doctorName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.black,
-                      ),
-                    ),
-                    Text(
-                      specialty,
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        Row(
-                          children: List.generate(5, (index) {
-                            return Icon(
-                              index < rating ? Icons.star : Icons.star_border,
-                              color: Colors.amber,
-                              size: 18,
-                            );
-                          }),
-                        ),
-                        const SizedBox(width: 10),
-                        if (isLicenseVerified)
-                          const Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.green, size: 18),
-                              SizedBox(width: 4),
-                              Text(
-                                'License Verified',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 13,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, color: Colors.grey),
-            ],
+          // Vet icon
+          Container(
+            width: 55,
+            height: 55,
+            decoration: BoxDecoration(
+              color: _mint.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: const Icon(Icons.person, size: 30, color: _mintDark),
           ),
-          const SizedBox(height: 15),
-          // Available Times and Book Now Buttons
-          Column(
-            children: availableTimes.map((time) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Row(
+          const SizedBox(width: 15),
+
+          // Vet info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 5 Star Rating at the top
+                Row(
+                  children: List.generate(
+                    rating,
+                    (index) =>
+                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Name
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _mintDark,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                // Specialty
+                Text(
+                  specialty,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                const SizedBox(height: 4),
+                // Location
+                Row(
                   children: [
-                    const Icon(Icons.access_time, color: Colors.grey, size: 20),
-                    const SizedBox(width: 10),
+                    const Icon(Icons.location_on, color: _mint, size: 14),
+                    const SizedBox(width: 4),
                     Text(
-                      time,
-                      style: const TextStyle(fontSize: 16, color: Colors.black87),
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: 100,
-                      child: ElevatedButton(
-                        onPressed: onBookNow, // No longer passing time, just navigating
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF61972E),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          'Book now',
-                          style: TextStyle(color: Colors.white, fontSize: 14),
-                        ),
+                      location,
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
                       ),
                     ),
                   ],
                 ),
-              );
-            }).toList(),
+                const SizedBox(height: 4),
+                // License Verified
+                Row(
+                  children: const [
+                    Icon(Icons.verified, color: _mint, size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'License Verified',
+                      style: TextStyle(color: Colors.black54, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Book Now Button with white text
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _mint,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BookAppointmentPage(
+                        vetName: name,
+                        vetSpecialty: specialty,
+                        vetRating: rating,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Book Now',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

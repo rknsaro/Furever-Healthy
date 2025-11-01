@@ -36,14 +36,17 @@ dependencies:
   shared_preferences: ^2.2.2
   cupertino_icons: ^1.0.8
   intl: ^0.18.1 
-  http: ^0.13.6 # for API calls
+  http: 1.1.0 # for API calls
   flutter_dotenv: ^5.0.2
   image_picker: ^1.1.2
   google_sign_in: ^6.1.5
   flutter_facebook_auth: ^6.0.3
-  twitter_login: ^4.3.0
+  twitter_login:
+    git:
+      url: https://github.com/0maru/twitter_login.git
   flutter_markdown: ^0.6.0
   file_picker: ^6.1.1
+  google_generative_ai: ^0.4.3
   
 
 dev_dependencies:
@@ -98,7 +101,18 @@ flutter:
     - assets/upload.png
     - assets/schedule.png
     - assets/reminders.png
-
+    - assets/recent_notes.png
+    - assets/pet_grooming.png
+    - assets/pet_feeding.png
+    - assets/pet_medication.png
+    - assets/pet_vaccines.png
+    - assets/feeding_white.png
+    - assets/grooming_white.png
+    - assets/medicine_white.png
+    - assets/notes_white.png
+    - assets/vaccine_white.png
+    - assets/notif_bell.png
+    - assets/user_prof.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

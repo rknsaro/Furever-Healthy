@@ -21,6 +21,7 @@ class _MedicationsPageState extends State<MedicationsPage> {
     required String title,
     required String description,
     required String buttonText,
+    required String iconPath,
     required VoidCallback onPressed,
   }) {
     return Container(
@@ -53,7 +54,7 @@ class _MedicationsPageState extends State<MedicationsPage> {
           Center(
             child: Column(
               children: [
-                Image.asset('assets/schedule.png', width: 40, height: 40, color: _mint),
+                Image.asset(iconPath, width: 40, height: 40, color: _mint),
                 const SizedBox(height: 10),
                 Text(
                   description,
@@ -147,9 +148,8 @@ class _MedicationsPageState extends State<MedicationsPage> {
               title: 'Ongoing Medications',
               description: 'Keep track of ongoing medications.',
               buttonText: 'Add medication',
-              onPressed: () {
-                _showAddMedicationDialog();
-              },
+              iconPath: 'assets/pet_medication.png',
+              onPressed: _showAddMedicationDialog,
             ),
 
             // ✅ Vaccines Section
@@ -157,28 +157,12 @@ class _MedicationsPageState extends State<MedicationsPage> {
               title: 'Vaccines',
               description: 'There are no vaccines to display.',
               buttonText: 'Add vaccine',
-              onPressed: () {
-                _showAddMedicationDialog();
-              },
+              iconPath: 'assets/pet_vaccines.png',
+              onPressed: _showAddMedicationDialog,
             ),
           ],
         ),
       ),
-
-      // ✅ Floating Centered Button
-      // floatingActionButton: FloatingActionButton.extended(
-      //   backgroundColor: _mint,
-      //   icon: const Icon(Icons.add, color: Colors.white),
-      //   label: const Text(
-      //     'New Medication',
-      //     style: TextStyle(
-      //       color: Colors.white,
-      //       fontWeight: FontWeight.bold,
-      //     ),
-      //   ),
-      //   onPressed: _showAddMedicationDialog,
-      // ),
-      // floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

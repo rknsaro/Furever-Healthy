@@ -1,12 +1,18 @@
 // lib/identify_breed.dart
+// ignore_for_file: unused_field
+import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+// import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 
-// conditional import: picks the web implementation when building for web,
-// and the IO implementation otherwise.
+import 'breed_detail_screen.dart';
 import 'identify_breed_picker_io.dart'
     if (dart.library.html) 'identify_breed_picker_web.dart';
+
+const _mint = Color(0xFF6F994A);
+const _mintDark = Color(0xFF112F15);
+const _screenBg = Color(0xFFF6F8FB);
 
 class IdentifyBreedScreen extends StatefulWidget {
   const IdentifyBreedScreen({super.key});
@@ -20,10 +26,27 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
   String? _selectedFileName;
   bool _isIdentifying = false;
 
+  final _model = GenerativeModel(
+    model: 'gemini-2.5-flash',
+    apiKey: 'AIzaSyCsFXMHJmZwB1nwvACe9sy2WV8HDxZLsAg', // Replace this
+  );
+
   Future<void> _pickImage() async {
     try {
       final picked = await pickImageBytes();
       if (picked != null) {
+        // Validate file type
+        final fileName = picked.name.toLowerCase();
+        if (!fileName.endsWith('.jpg') &&
+            !fileName.endsWith('.jpeg') &&
+            !fileName.endsWith('.png')) {
+          _showAlert(
+            'Invalid File Type',
+            'Please upload only .jpg, .jpeg, or .png image files.',
+          );
+          return;
+        }
+
         setState(() {
           _selectedImageBytes = picked.bytes;
           _selectedFileName = picked.name;
@@ -44,30 +67,40 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
 
   Future<void> _identifyBreed() async {
     if (_selectedImageBytes == null) {
-      _showAlert('Please upload an image', 'Select a pet photo before identifying the breed.');
+      _showAlert(
+        'Please upload an image',
+        'Select a pet photo before identifying the breed.',
+      );
       return;
     }
 
     setState(() => _isIdentifying = true);
 
-    // Show loading dialog (non-dismissible)
+    // Show loading spinner dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => WillPopScope(
         onWillPop: () async => false,
         child: Dialog(
-          backgroundColor: Colors.white,
+          backgroundColor: _mintDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: const [
-                CircularProgressIndicator(
-                  color: Color(0xFF6F994A), // spinner color
-                ),
+                CircularProgressIndicator(color: _mint),
                 SizedBox(width: 20),
-                Text('Identifying breed...'),
+                Text(
+                  'Identifying breed...',
+                  style: TextStyle(
+                    color: _screenBg,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),
@@ -76,13 +109,98 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     );
 
     try {
-      // Simulated delay — replace with actual API call later
-      await Future.delayed(const Duration(seconds: 2));
+      // 🔹 Ask Gemini to identify the animal type and breed
+      final prompt = """
+      Analyze this image and return a JSON object only in this format:
 
-      final fileNameDisplay = _selectedFileName ?? 'selected image';
-      Navigator.of(context).pop(); // close spinner
-      _showAlert('Breed Identified',
-          'Simulated result for $fileNameDisplay\n(Replace with real API result.)');
+      {
+        "animal_type": "cat or dog or other",
+        "breed": "breed name or 'unknown'",
+        "breed_group": "breed group (e.g., Sporting, Working, Toy, etc.)",
+        "size": "size (e.g., Small, Medium, Large, Medium-large)",
+        "life_span": "typical life span (e.g., 10-12 years)",
+        "description": "brief 2-3 sentence description of this breed's temperament and traits",
+        "characteristics": {
+          "Friendliness": 85,
+          "Trainability": 90,
+          "Energy Level": 80,
+          "Shedding": 70
+        },
+        "care_guide": {
+          "nutrition": "detailed nutrition advice with specific dietary needs",
+          "grooming": "detailed grooming requirements and frequency",
+          "exercise": "detailed exercise needs and activity recommendations",
+          "health": "common health issues and preventive care recommendations"
+        }
+      }
+
+      Important: 
+      - Characteristics values should be integers from 0-100
+      - Provide accurate breed information based on the image
+      - Be detailed in care_guide sections (at least 2-3 sentences each)
+      Only output valid JSON.
+      """;
+
+      final response = await _model.generateContent([
+        Content.multi([
+          TextPart(prompt),
+          DataPart('image/jpeg', _selectedImageBytes!),
+        ]),
+      ]);
+
+      Navigator.of(context).pop(); // Close spinner
+
+      final text = response.text?.trim() ?? '';
+      if (text.isEmpty) {
+        _showAlert('Error', 'No response received from the AI.');
+        return;
+      }
+
+      // Clean and parse JSON safely
+      final cleaned = text
+          .replaceAll('```json', '')
+          .replaceAll('```', '')
+          .trim();
+
+      late final Map<String, dynamic> data;
+      try {
+        data = jsonDecode(cleaned);
+      } catch (e) {
+        _showAlert('Error', 'Invalid response format from AI.');
+        return;
+      }
+
+      final animalType = (data['animal_type'] ?? '').toString().toLowerCase();
+      if (animalType != 'cat' && animalType != 'dog') {
+        _showAlert(
+          'Upload Correct Pet',
+          'This image appears to be a $animalType. Please upload a photo of a cat or dog for breed identification.',
+        );
+        return;
+      }
+
+      // Navigate to detailed breed screen
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BreedDetailScreen(
+              imageBytes: _selectedImageBytes!,
+              breed: data['breed'] ?? 'Unknown Breed',
+              breedGroup: data['breed_group'] ?? 'Unknown',
+              size: data['size'] ?? 'Unknown',
+              lifeSpan: data['life_span'] ?? 'Unknown',
+              description: data['description'] ?? 'No description available.',
+              characteristics: Map<String, int>.from(
+                (data['characteristics'] as Map<String, dynamic>?) ?? {},
+              ),
+              careGuide: Map<String, dynamic>.from(
+                (data['care_guide'] as Map<String, dynamic>?) ?? {},
+              ),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       Navigator.of(context).pop();
       _showAlert('Error', e.toString());
@@ -112,20 +230,20 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     bool shouldExit = false;
     await showDialog(
       context: context,
-      barrierDismissible: false, // Prevent closing by tapping outside
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF112F15),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Cancel Identification',
           style: TextStyle(
-            color: Colors.white,
+            color: Color(0xFFF6F8FB),
             fontWeight: FontWeight.bold,
           ),
         ),
         content: const Text(
           'Are you sure you want to go back? This will cancel the breed identification process.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: Color(0xFFF6F8FB)),
         ),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         actions: [
@@ -135,9 +253,9 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
               shouldExit = false;
             },
             child: const Text(
-              'Stay',
+              'No',
               style: TextStyle(
-                color: Color(0xFFB0DDA2),
+                color: Color(0xFFF6F8FB),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -148,9 +266,9 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
               shouldExit = true;
             },
             child: const Text(
-              'Exit',
+              'Yes',
               style: TextStyle(
-                color: Colors.redAccent,
+                color: Color(0xFFF6F8FB),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -166,7 +284,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
       aspectRatio: 1,
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF2E4133),
+          color: const Color(0xFF112F15),
           borderRadius: BorderRadius.circular(12),
         ),
         child: InkWell(
@@ -181,7 +299,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
                     errorBuilder: (_, __, ___) => const Center(
                       child: Text(
                         'Error loading image',
-                        style: TextStyle(color: Colors.white70),
+                        style: TextStyle(color: Color(0xB3FFFFFF)),
                       ),
                     ),
                   ),
@@ -204,7 +322,10 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     );
   }
 
-  Widget _buildActionButton({required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildActionButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -240,7 +361,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Header: Back Button + Centered Title
+                // Header: Back Button
                 Row(
                   children: [
                     IconButton(
@@ -252,33 +373,25 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
                         }
                       },
                     ),
-                    // const Expanded(
-                    //   child: Center(
-                    //     child: Text(
-                    //       'Identify Pet Breed',
-                    //       style: TextStyle(
-                    //         color: Colors.white,
-                    //         fontSize: 20,
-                    //         fontWeight: FontWeight.bold,
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
-                    const SizedBox(width: 48), // Spacer to balance back button
+                    const SizedBox(width: 48),
                   ],
                 ),
                 const SizedBox(height: 16),
 
-                // Image uploader
                 Expanded(child: Center(child: _buildImageUploader())),
                 const SizedBox(height: 30),
 
-                // Action buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildActionButton(icon: Icons.refresh, onPressed: _retryUpload),
-                    _buildActionButton(icon: Icons.check, onPressed: _identifyBreed),
+                    _buildActionButton(
+                      icon: Icons.refresh,
+                      onPressed: _retryUpload,
+                    ),
+                    _buildActionButton(
+                      icon: Icons.check,
+                      onPressed: _identifyBreed,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),

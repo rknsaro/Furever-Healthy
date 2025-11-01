@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fureverhealthy/my_pets/add_new_pet.dart';
-import 'package:fureverhealthy/appointment.dart'; // ✅ Added import for AppointmentPage
+import 'package:fureverhealthy/appointment.dart';
+import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
+// 1. IMPORT THE NEW REMINDERS TAB FILE
+import 'package:fureverhealthy/reminders_tab.dart'; 
+import 'package:fureverhealthy/recent_notes.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -153,10 +157,10 @@ class _AllPetsPageState extends State<AllPetsPage> with SingleTickerProviderStat
                   padding: const EdgeInsets.all(16),
                   child: TabBarView(
                     controller: _tabController,
-                    children: const [
+                    children: [
                       _ProfileTab(),
-                      _AppointmentsTab(),
-                      _RemindersTab(),
+                      const _AppointmentsTab(),
+                      const _RemindersTabWrapper(), // Use the new wrapper
                     ],
                   ),
                 ),
@@ -169,12 +173,13 @@ class _AllPetsPageState extends State<AllPetsPage> with SingleTickerProviderStat
   }
 }
 
-// Profile Tab
+// ====================== PROFILE TAB ======================
 class _ProfileTab extends StatelessWidget {
-  const _ProfileTab();
+  _ProfileTab({super.key});
 
   Widget _buildCard({
     required String title,
+    required String iconPath,
     required String description,
     required String buttonText,
     required VoidCallback onPressed,
@@ -209,7 +214,7 @@ class _ProfileTab extends StatelessWidget {
           Center(
             child: Column(
               children: [
-                Image.asset('assets/schedule.png', width: 40, height: 40, color: _mint),
+                Image.asset(iconPath, width: 40, height: 40, color: _mint),
                 const SizedBox(height: 10),
                 Text(
                   description,
@@ -243,7 +248,7 @@ class _ProfileTab extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -263,7 +268,6 @@ class _ProfileTab extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left side with mint line + text
           Row(
             children: [
               Container(
@@ -300,7 +304,10 @@ class _ProfileTab extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
-              // Edit profile logic
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const EditPetProfilePage()),
+              );
             },
             child: const Text(
               'Edit',
@@ -323,33 +330,43 @@ class _ProfileTab extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           children: [
-            _buildProfileHeader(),
+            _buildProfileHeader(context),
             _buildCard(
               title: 'Recent notes',
+              iconPath: 'assets/recent_notes.png',
               description: 'Add a note to record important information, details or events.',
               buttonText: 'Add note',
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RecentNotesPage()),
+                );
+              },
             ),
             _buildCard(
               title: 'Grooming',
+              iconPath: 'assets/pet_grooming.png',
               description: 'Set a schedule for your pet’s routine care and maintenance.',
               buttonText: 'Add grooming',
               onPressed: () {},
             ),
             _buildCard(
               title: 'Feeding',
+              iconPath: 'assets/pet_feeding.png',
               description: 'Set a schedule for your pet’s daily meals and portion sizes.',
               buttonText: 'Add feeding',
               onPressed: () {},
             ),
             _buildCard(
               title: 'Ongoing Medications',
+              iconPath: 'assets/pet_medication.png',
               description: 'Keep track of ongoing medications.',
               buttonText: 'Add medication',
               onPressed: () {},
             ),
             _buildCard(
               title: 'Vaccines',
+              iconPath: 'assets/pet_vaccines.png',
               description: 'There are no vaccines to display.',
               buttonText: 'Add vaccine',
               onPressed: () {},
@@ -361,13 +378,13 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-// ✅ Appointments Tab (now opens AppointmentPage)
+// ====================== APPOINTMENTS TAB ======================
 class _AppointmentsTab extends StatelessWidget {
   const _AppointmentsTab();
 
   @override
   Widget build(BuildContext context) {
-    return _EmptyStateWidget(
+    return EmptyStateWidget(
       iconPath: 'assets/schedule.png',
       message: 'No vet appointment scheduled yet.',
       buttonText: 'Add appointment',
@@ -381,29 +398,33 @@ class _AppointmentsTab extends StatelessWidget {
   }
 }
 
-// Reminders Tab (same design)
-class _RemindersTab extends StatelessWidget {
-  const _RemindersTab();
+// ====================== REMINDERS TAB WRAPPER (to use the external file) ======================
+class _RemindersTabWrapper extends StatelessWidget {
+  const _RemindersTabWrapper();
 
   @override
   Widget build(BuildContext context) {
-    return _EmptyStateWidget(
-      iconPath: 'assets/schedule.png',
+    // 3. REPLACING THE LOCAL _RemindersTab with a call to the new file's widget
+    return RemindersTab(
+      // We pass the required props to keep the logic here
+      // The button pressed logic is now inside RemindersTab
+      iconPath: 'assets/reminders.png',
       message: 'No reminders for now. Want to set one up?',
       buttonText: 'Add reminder',
-      onPressed: () {},
     );
   }
 }
 
-// Reusable Empty State Widget
-class _EmptyStateWidget extends StatelessWidget {
+// ====================== REUSABLE EMPTY STATE (made public) ======================
+// 2. RENAMED FROM _EmptyStateWidget to EmptyStateWidget (removed underscore)
+class EmptyStateWidget extends StatelessWidget {
   final String iconPath;
   final String message;
   final String buttonText;
-  final VoidCallback onPressed;
+  final VoidCallback onPressed; // This is the original prop
 
-  const _EmptyStateWidget({
+  const EmptyStateWidget({
+    super.key,
     required this.iconPath,
     required this.message,
     required this.buttonText,
@@ -425,7 +446,7 @@ class _EmptyStateWidget extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: onPressed,
+            onPressed: onPressed, // Use the passed-in onPressed callback
             style: ElevatedButton.styleFrom(
               backgroundColor: _mint,
               shape: RoundedRectangleBorder(
@@ -448,7 +469,7 @@ class _EmptyStateWidget extends StatelessWidget {
   }
 }
 
-// Pet Circle
+// ====================== PET CIRCLE ======================
 class _PetCircle extends StatelessWidget {
   final String name;
   final String imagePath;
@@ -485,7 +506,7 @@ class _PetCircle extends StatelessWidget {
   }
 }
 
-// Add New Pet Circle
+// ====================== ADD NEW PET CIRCLE ======================
 class _AddCircle extends StatelessWidget {
   final VoidCallback onTap;
 

@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
-// ignore: unused_import
-import 'package:fureverhealthy/pet_profile.dart';
 import 'package:fureverhealthy/appointment.dart';
 import 'package:fureverhealthy/pet_guide.dart';
-// ignore: unused_import
-import 'package:fureverhealthy/models/pet_model.dart';
 import 'package:fureverhealthy/symptom_check.dart';
-// import 'package:fureverhealthy/quick_actions/community.dart';
 import 'package:fureverhealthy/quick_actions/quick_actions_panel.dart';
-import 'package:fureverhealthy/my_pets/add_new_pet.dart'; // This is the new import
+import 'package:fureverhealthy/my_pets/add_new_pet.dart';
 import 'package:fureverhealthy/my_pets/all_pets.dart';
 import 'package:fureverhealthy/identify_breed.dart';
+import 'user_prof_tab.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -26,20 +22,27 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomeTab(),
-    PetGuidePage(),
-    AppointmentPage(),
-    ProfileTab(),
-  ];
-
   void _onItemTapped(int i) => setState(() => _selectedIndex = i);
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _screenBg,
-      appBar: AppBar(
+  Widget _buildPage() {
+    switch (_selectedIndex) {
+      case 0:
+        return const HomeTab();
+      case 1:
+        return _PageWithHeader(child: const PetGuidePage());
+      case 2:
+        return _PageWithHeader(child: const AppointmentPage());
+      case 3:
+        return _PageWithHeader(child: const UserProfTab());
+      default:
+        return const HomeTab();
+    }
+  }
+
+  PreferredSizeWidget? _buildAppBar() {
+    if (_selectedIndex == 0) {
+      // Show full header on Home tab
+      return AppBar(
         toolbarHeight: 60,
         backgroundColor: _mint,
         elevation: 0,
@@ -61,19 +64,23 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
+            icon: Image.asset('assets/notif_bell.png', height: 26),
             onPressed: () {},
             tooltip: 'Notifications',
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white),
-            onPressed: () {},
-            tooltip: 'Settings',
-          ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
         ],
-      ),
-      body: _pages[_selectedIndex],
+      );
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _screenBg,
+      appBar: _buildAppBar(),
+      body: _buildPage(),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
@@ -106,6 +113,59 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class _PageWithHeader extends StatelessWidget {
+  final Widget child;
+
+  const _PageWithHeader({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Header matches the screenshot
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: const BoxDecoration(
+            color: _mint,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Image.asset('assets/furever.png', height: 36),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Furever Healthy',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              Image.asset('assets/notif_bell.png', height: 26),
+            ],
+          ),
+        ),
+        Expanded(child: child),
+      ],
+    );
+  }
+}
+
+/* ——————————————————————————————
+   HOME TAB (unchanged)
+—————————————————————————————— */
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key});
 
@@ -186,34 +246,32 @@ class HomeTab extends StatelessWidget {
 
             // MY PETS
             Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'My Pets',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-              TextButton(
-                // MODIFIED: Add navigation here
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AllPetsPage(), // <--- USE AllPetsPage
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'My Pets',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AllPetsPage(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'All',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w700,
                     ),
-                  );
-                },
-                child: const Text(
-                  'All',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
 
-            // round avatars
             SizedBox(
               height: 100,
               child: ListView(
@@ -222,11 +280,11 @@ class HomeTab extends StatelessWidget {
                 children: const [
                   _PetCircle(name: 'Spencer', imagePath: 'assets/dog.png'),
                   SizedBox(width: 10),
-                  _AddCircle(), // This widget is now tappable
+                  _AddCircle(),
                 ],
               ),
             ),
-            // PET CARD (horizontal scroller)
+
             SizedBox(
               height: petCardHeight + 30,
               child: SingleChildScrollView(
@@ -251,14 +309,8 @@ class HomeTab extends StatelessWidget {
             ),
 
             const SizedBox(height: 18),
-            const Divider(
-              height: 1,
-              thickness: 3,
-              color: Color(0x11000000),
-            ),
+            const Divider(height: 1, thickness: 3, color: Color(0x11000000)),
             const SizedBox(height: 18),
-
-            // QUICK ACTIONS PANEL
             const QuickActionsPanel(),
           ],
         ),
@@ -267,8 +319,7 @@ class HomeTab extends StatelessWidget {
   }
 }
 
-/* —— Small helper widgets —— */
-
+/* Helper widgets (unchanged) */
 class _FilledPillButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -330,13 +381,9 @@ class _PetCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
+        SizedBox(
           width: 70,
           height: 70,
-          // decoration: const BoxDecoration(
-          //   shape: BoxShape.circle,
-          //   color: Color(0xFFE6FFF7),
-          // ),
           child: Center(child: Image.asset(imagePath, height: 40)),
         ),
         const SizedBox(height: 6),
@@ -349,7 +396,6 @@ class _PetCircle extends StatelessWidget {
   }
 }
 
-// MODIFIED TO NAVIGATE ON TAP
 class _AddCircle extends StatelessWidget {
   const _AddCircle();
 
@@ -357,24 +403,16 @@ class _AddCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Navigates to the AddNewPetPage when tapped
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => const AddNewPetPage(),
-          ),
+          MaterialPageRoute(builder: (context) => const AddNewPetPage()),
         );
       },
       child: Column(
         children: [
-          Container(
+          SizedBox(
             width: 72,
             height: 72,
-            // Added a color for better visibility as a tappable area
-            // decoration: BoxDecoration(
-            //   shape: BoxShape.circle,
-            //   color: Colors.grey[200],
-            // ),
             child: Center(child: Image.asset('assets/add_post.png', height: 44)),
           ),
           const SizedBox(height: 6),
@@ -423,7 +461,6 @@ class _PetDetailCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // slim mint bar
           Container(
             width: 4,
             height: double.infinity,
@@ -433,8 +470,6 @@ class _PetDetailCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-
-          // avatar
           Container(
             width: 64,
             height: 64,
@@ -442,16 +477,11 @@ class _PetDetailCard extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
-                center: Alignment(-0.2, -0.2),
-                focal: Alignment(-0.1, -0.1),
-                focalRadius: .8,
               ),
             ),
             child: Center(child: Image.asset(imagePath, height: 40)),
           ),
           const SizedBox(width: 12),
-
-          // info
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -481,10 +511,9 @@ class _PetDetailCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  breed,
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
-                ),
+                Text(breed,
+                    style:
+                        const TextStyle(color: Colors.black54, fontSize: 13)),
                 const SizedBox(height: 10),
                 Container(
                   padding:
@@ -508,17 +537,6 @@ class _PetDetailCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class ProfileTab extends StatelessWidget {
-  const ProfileTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Profile Page', style: TextStyle(fontSize: 18)),
     );
   }
 }
