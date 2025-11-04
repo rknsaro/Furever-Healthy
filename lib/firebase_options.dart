@@ -41,49 +41,50 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDgvys5BoKUALqx_DCqPeLlzkNo4MFXjms',
-    appId: '1:802623602942:web:056dcfe37c4d5024dfe5af',
-    messagingSenderId: '802623602942',
-    projectId: 'furever-healthy-2a1ae',
-    authDomain: 'furever-healthy-2a1ae.firebaseapp.com',
-    storageBucket: 'furever-healthy-2a1ae.firebasestorage.app',
-    measurementId: 'G-X2KP2Q18CP',
+    apiKey: 'AIzaSyB0BPUNYKl3JzJxT2SQBQkQ8b3ioWhHsoc',
+    appId: '1:154419208249:web:dd77a0f06873a0a0e5ede8',
+    messagingSenderId: '154419208249',
+    projectId: 'fureverhealthy-admin',
+    authDomain: 'fureverhealthy-admin.firebaseapp.com',
+    storageBucket: 'fureverhealthy-admin.firebasestorage.app',
+    measurementId: 'G-L4N3KBHRMZ',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDq_QtR3ZwaRLjd3p4MXze0cPnRx7k5jco',
-    appId: '1:802623602942:android:52edf733baa96c1cdfe5af',
-    messagingSenderId: '802623602942',
-    projectId: 'furever-healthy-2a1ae',
-    storageBucket: 'furever-healthy-2a1ae.firebasestorage.app',
+    apiKey: 'AIzaSyBJ-gjaPBNHwfG7yXdxeIB5OR0OjWo2wvs',
+    appId: '1:154419208249:android:15ba865b63b95606e5ede8',
+    messagingSenderId: '154419208249',
+    projectId: 'fureverhealthy-admin',
+    storageBucket: 'fureverhealthy-admin.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD3dysHYf1bXst4GiS5PeWcsYflv31eXDk',
-    appId: '1:802623602942:ios:5cf93d4f8dc9016edfe5af',
-    messagingSenderId: '802623602942',
-    projectId: 'furever-healthy-2a1ae',
-    storageBucket: 'furever-healthy-2a1ae.firebasestorage.app',
+    apiKey: 'AIzaSyAlGLxR3vmlLkhLEX5IGlVG7v7ieaAU4QU',
+    appId: '1:154419208249:ios:c1b2eb065b45191be5ede8',
+    messagingSenderId: '154419208249',
+    projectId: 'fureverhealthy-admin',
+    storageBucket: 'fureverhealthy-admin.firebasestorage.app',
+    iosClientId: '154419208249-dcll3sb6ro9a2kclj96i8vijesfdd7p8.apps.googleusercontent.com',
     iosBundleId: 'com.example.fureverhealthy',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD3dysHYf1bXst4GiS5PeWcsYflv31eXDk',
-    appId: '1:802623602942:ios:5cf93d4f8dc9016edfe5af',
-    messagingSenderId: '802623602942',
-    projectId: 'furever-healthy-2a1ae',
-    storageBucket: 'furever-healthy-2a1ae.firebasestorage.app',
+    apiKey: 'AIzaSyAlGLxR3vmlLkhLEX5IGlVG7v7ieaAU4QU',
+    appId: '1:154419208249:ios:c1b2eb065b45191be5ede8',
+    messagingSenderId: '154419208249',
+    projectId: 'fureverhealthy-admin',
+    storageBucket: 'fureverhealthy-admin.firebasestorage.app',
+    iosClientId: '154419208249-dcll3sb6ro9a2kclj96i8vijesfdd7p8.apps.googleusercontent.com',
     iosBundleId: 'com.example.fureverhealthy',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDgvys5BoKUALqx_DCqPeLlzkNo4MFXjms',
-    appId: '1:802623602942:web:056dcfe37c4d5024dfe5af',
-    messagingSenderId: '802623602942',
-    projectId: 'furever-healthy-2a1ae',
-    authDomain: 'furever-healthy-2a1ae.firebaseapp.com',
-    storageBucket: 'furever-healthy-2a1ae.firebasestorage.app',
-    measurementId: 'G-X2KP2Q18CP',
+    apiKey: 'AIzaSyB0BPUNYKl3JzJxT2SQBQkQ8b3ioWhHsoc',
+    appId: '1:154419208249:web:8af02cc383ac9615e5ede8',
+    messagingSenderId: '154419208249',
+    projectId: 'fureverhealthy-admin',
+    authDomain: 'fureverhealthy-admin.firebaseapp.com',
+    storageBucket: 'fureverhealthy-admin.firebasestorage.app',
+    measurementId: 'G-5JJK2ZD7QG',
   );
-
 }

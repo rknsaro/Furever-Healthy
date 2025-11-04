@@ -1,8 +1,9 @@
 // lib/my_pets/recent_notes.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 const _mint = Color(0xFF6F994A);
-const _mintDark = Color(0xFF112F15);
+const _screenBg = Color(0xFFF6F8FB);
 
 class RecentNotesPage extends StatefulWidget {
   const RecentNotesPage({super.key});
@@ -14,221 +15,450 @@ class RecentNotesPage extends StatefulWidget {
 class _RecentNotesPageState extends State<RecentNotesPage> {
   String _noteType = 'General';
   String _activityType = 'Walk';
-  final TextEditingController _noteController = TextEditingController();
+  String? _selectedPet;
+  DateTime _selectedDate = DateTime.now();
+  TimeOfDay _selectedTime = TimeOfDay.now();
 
-  final List<String> noteTypes = ['General', 'Activity', 'Vet Appointment'];
+  final TextEditingController _noteController = TextEditingController();
+  final List<String> noteTypes = ['General', 'Vet appointment', 'Activity'];
   final List<String> activityTypes = ['Walk', 'Run', 'Food', 'Water'];
+  final List<String> pets = ['Spencer', 'Luna', 'Ggomo']; // Example pets
+
+  @override
+  void initState() {
+    super.initState();
+    _noteController.addListener(() {
+      setState(() {}); // Update character count
+    });
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _mint,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _mint,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _selectedTime) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
+  }
+
+  void _showNoteTypeDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Note Type'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: noteTypes.map((type) {
+              return ListTile(
+                title: Text(type),
+                onTap: () {
+                  setState(() {
+                    _noteType = type;
+                  });
+                  Navigator.pop(context);
+                },
+                selected: _noteType == type,
+                selectedTileColor: _mint.withOpacity(0.1),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showActivityTypeDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Activity Type'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: activityTypes.map((type) {
+              return ListTile(
+                title: Text(type),
+                onTap: () {
+                  setState(() {
+                    _activityType = type;
+                  });
+                  Navigator.pop(context);
+                },
+                selected: _activityType == type,
+                selectedTileColor: _mint.withOpacity(0.1),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPetSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select Pet'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: pets.map((pet) {
+              return ListTile(
+                title: Text(pet),
+                onTap: () {
+                  setState(() {
+                    _selectedPet = pet;
+                  });
+                  Navigator.pop(context);
+                },
+                selected: _selectedPet == pet,
+                selectedTileColor: _mint.withOpacity(0.1),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final int characterCount = _noteController.text.length;
+
     return Scaffold(
-      backgroundColor: _mint,
+      backgroundColor: _screenBg,
       appBar: AppBar(
         backgroundColor: _mint,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Furever Healthy',
+          'Note',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: 25,
           ),
         ),
-        centerTitle: true,
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16.0),
-            child: Icon(Icons.notifications, color: Colors.white),
-          )
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Image.asset('assets/notif_bell.png', width: 24),
+          ),
         ],
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tabs Section (Profile / Appointments / Reminders)
+            // Note Type Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Note Type',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _showNoteTypeDialog,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _mint,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _noteType,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Activity Type (only shows when Activity is selected)
+            if (_noteType == 'Activity') ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Activity Type',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _showActivityTypeDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _mint,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _activityType,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Text Field with Character Count
             Container(
-              color: _mint,
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: const [
-                  Text("Profile", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  Text("Appointments", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  Text("Reminders", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _noteController,
+                    maxLines: 5,
+                    maxLength: 500,
+                    decoration: const InputDecoration(
+                      hintText: '',
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.all(16),
+                      counterText: '', // Hide default counter
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16, bottom: 8),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '$characterCount/500',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
+            const SizedBox(height: 16),
 
-            // Rounded white section
-            Container(
+            // Pets Section
+            const Text(
+              'Pets',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
               width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30), topRight: Radius.circular(30),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _mint,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: _showPetSelectionDialog,
+                child: Text(
+                  _selectedPet ?? 'Select Pets',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  const Text(
-                    "Note",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
+            ),
+            const SizedBox(height: 16),
 
-                  // Note Type
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Note Type",
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                      DropdownButton<String>(
-                        value: _noteType,
-                        dropdownColor: Colors.white,
-                        underline: Container(),
-                        items: noteTypes.map((type) {
-                          return DropdownMenuItem<String>(
-                            value: type,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: _mint.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              child: Text(
-                                type,
-                                style: const TextStyle(
-                                  color: _mint,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+            // Date and Time Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Date
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _selectDate(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Date',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Text(
+                            DateFormat('d MMM yyyy').format(_selectedDate),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _noteType = value!;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // Activity Type (only shows when Activity is selected)
-                  if (_noteType == 'Activity') ...[
-                    const Text(
-                      "Activity Type",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      value: _activityType,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: _mint),
+                          ),
                         ),
-                      ),
-                      items: activityTypes.map((act) {
-                        return DropdownMenuItem<String>(
-                          value: act,
-                          child: Text(act),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _activityType = value!;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Text box for note
-                  TextField(
-                    controller: _noteController,
-                    maxLines: 6,
-                    maxLength: 500,
-                    decoration: InputDecoration(
-                      hintText: "Write your note here...",
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.grey),
-                      ),
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // Select Pet Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _mint,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
+                ),
+                const SizedBox(width: 16),
+                // Time
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _selectTime(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Time',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                      onPressed: () {},
-                      child: const Text("Select Pets"),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Date and Time Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text("Date", style: TextStyle(fontWeight: FontWeight.w600)),
-                          SizedBox(height: 6),
-                          Text("30 Oct 2025"),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text("Time", style: TextStyle(fontWeight: FontWeight.w600)),
-                          SizedBox(height: 6),
-                          Text("6:00 PM"),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Add Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _mint,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(30),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Text(
+                            _selectedTime.format(context),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
                         ),
-                      ),
-                      onPressed: () {},
-                      child: const Text("Add"),
+                      ],
                     ),
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Add Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _mint,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () {
+                  // Handle add note logic
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Note added successfully!'),
+                      backgroundColor: _mint,
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Add',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fureverhealthy/my_pets/all_pets.dart'; // ✅ Import AllPetsPage
+import 'account_session.dart';
 
 const _mint = Color(0xFF6F994A);
 const _bg = Color(0xFFF9F9F9);
@@ -178,7 +179,14 @@ class _UserProfTabState extends State<UserProfTab> {
                   context: context,
                   title: 'Account & Session',
                   trailingIcon: Icons.arrow_forward_ios,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AccountSessionPage(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

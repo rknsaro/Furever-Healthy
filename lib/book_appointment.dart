@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
 const _screenBg = Color(0xFFF6F8FB);
 
 class BookAppointmentPage extends StatefulWidget {
+  final String vetId;
   final String vetName;
   final String vetSpecialty;
   final int vetRating;
 
   const BookAppointmentPage({
     super.key,
+    required this.vetId,
     required this.vetName,
     required this.vetSpecialty,
     required this.vetRating,
@@ -25,7 +29,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   String? selectedPet;
   String? selectedReason;
   int? estimatedCost;
-  String selectedType = 'Walk-in';
+  String selectedType = 'In person';
   String? selectedTime;
   DateTime selectedDate = DateTime.now();
 
@@ -187,7 +191,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
         const SizedBox(height: 8),
         Row(
           children: [
-            _typeButton('Walk-in'),
+            _typeButton('In person'),
             const SizedBox(width: 10),
             _typeButton('Online Consultation'),
           ],
@@ -269,7 +273,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 // Validate all required fields
                 List<String> missingFields = [];
 
@@ -285,13 +289,32 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
                 if (missingFields.isEmpty) {
                   // All fields are filled, proceed with booking
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Appointment Booked Successfully!'),
-                      backgroundColor: _mint,
-                    ),
-                  );
-                  Navigator.pop(context);
+                  try {
+                    await _saveAppointmentToFirestore();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Appointment booked! Waiting for vet confirmation.',
+                          ),
+                          backgroundColor: _mint,
+                        ),
+                      );
+                      Navigator.pop(context);
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Error booking appointment: ${e.toString()}',
+                          ),
+                          backgroundColor: Colors.red,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
                 } else {
                   // Show error message with missing fields
                   String message =
@@ -547,5 +570,67 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
         ],
       ),
     );
+  }
+
+  // Save appointment to Firestore
+  Future<void> _saveAppointmentToFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    // Combine date and time for appointment datetime
+    final appointmentDateTime = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      _parseHourFromTime(selectedTime!),
+      _parseMinuteFromTime(selectedTime!),
+    );
+
+    // Get appointment data
+    final appointmentData = {
+      'userId': user.uid,
+      'userEmail': user.email ?? '',
+      'userName': user.displayName ?? '',
+      'petName': selectedPet!,
+      'vetId': widget.vetId,
+      'vetName': widget.vetName,
+      'vetSpecialty': widget.vetSpecialty,
+      'vetRating': widget.vetRating,
+      'appointmentType': selectedType,
+      'date': Timestamp.fromDate(selectedDate),
+      'timeSlot': selectedTime,
+      'appointmentDateTime': Timestamp.fromDate(appointmentDateTime),
+      'reason': selectedReason!,
+      'cost': estimatedCost ?? 0,
+      'status':
+          'pending', // pending, declined, confirmed, cancelled (only vets can change)
+      'createdAt': Timestamp.now(),
+    };
+
+    // Save to user_appointments collection
+    await FirebaseFirestore.instance
+        .collection('user_appointments')
+        .add(appointmentData);
+  }
+
+  // Helper methods to parse time string
+  int _parseHourFromTime(String time) {
+    // Format: "8:00 - 9:00 AM" or "1:00 - 2:00 PM"
+    final parts = time.split(' ')[0].split(':');
+    int hour = int.parse(parts[0]);
+    final isPM = time.contains('PM');
+    if (isPM && hour != 12) {
+      hour += 12;
+    } else if (!isPM && hour == 12) {
+      hour = 0;
+    }
+    return hour;
+  }
+
+  int _parseMinuteFromTime(String time) {
+    final parts = time.split(' ')[0].split(':');
+    return int.parse(parts[1]);
   }
 }
