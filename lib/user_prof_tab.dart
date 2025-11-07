@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fureverhealthy/my_pets/all_pets.dart'; // ✅ Import AllPetsPage
 import 'account_session.dart';
+import 'edit_user_prof.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 const _mint = Color(0xFF6F994A);
 const _bg = Color(0xFFF9F9F9);
@@ -14,6 +17,9 @@ class UserProfTab extends StatefulWidget {
 
 class _UserProfTabState extends State<UserProfTab> {
   String _selectedTile = ''; // Track which tile is selected
+  String? _userName;
+  String? _username;
+  String? _profileImageUrl;
 
   Widget _buildProfileTile({
     required BuildContext context,
@@ -127,6 +133,35 @@ class _UserProfTabState extends State<UserProfTab> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          setState(() {
+            _userName = data['name'] as String?;
+            _username = data['username'] as String?;
+            _profileImageUrl = data['profileImageUrl'] as String?;
+          });
+        }
+      } catch (e) {
+        print('Error loading user data: $e');
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
@@ -143,22 +178,32 @@ class _UserProfTabState extends State<UserProfTab> {
                     width: 130,
                     height: 130,
                     decoration: BoxDecoration(
-                      // shape: BoxShape.circle,
-                      // border: Border.all(color: _mint, width: 3),
-                      image: const DecorationImage(
-                        image: AssetImage('assets/user_prof.png'),
-                        fit: BoxFit.cover,
-                      ),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _mint, width: 3),
+                      image: _profileImageUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(_profileImageUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : const DecorationImage(
+                              image: AssetImage('assets/user_prof.png'),
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
-                  // const SizedBox(height: 10),
-                  const Text(
-                    'Profile',
-                    style: TextStyle(
+                  const SizedBox(height: 10),
+                  Text(
+                    _userName ?? 'Profile',
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: _mint,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _username != null ? '@$_username' : '',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 18),
                 ],
@@ -173,7 +218,18 @@ class _UserProfTabState extends State<UserProfTab> {
                   context: context,
                   title: 'Edit Profile',
                   trailingIcon: Icons.edit_outlined,
-                  onTap: () {},
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditUserProfPage(),
+                      ),
+                    );
+                    // Reload user data when returning from edit page
+                    if (result == true) {
+                      _loadUserData();
+                    }
+                  },
                 ),
                 _buildProfileTile(
                   context: context,

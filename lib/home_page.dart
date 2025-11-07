@@ -5,8 +5,11 @@ import 'package:fureverhealthy/symptom_check.dart';
 import 'package:fureverhealthy/quick_actions/quick_actions_panel.dart';
 import 'package:fureverhealthy/my_pets/add_new_pet.dart';
 import 'package:fureverhealthy/my_pets/all_pets.dart';
+import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
 import 'package:fureverhealthy/identify_breed.dart';
 import 'user_prof_tab.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -277,10 +280,10 @@ class HomeTab extends StatelessWidget {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
-                children: const [
-                  _PetCircle(name: 'Spencer', imagePath: 'assets/dog.png'),
-                  SizedBox(width: 10),
-                  _AddCircle(),
+                children: [
+                  const _PetCircle(),
+                  const SizedBox(width: 10),
+                  const _AddCircle(),
                 ],
               ),
             ),
@@ -294,13 +297,7 @@ class HomeTab extends StatelessWidget {
                   children: [
                     SizedBox(
                       width: petCardWidth,
-                      child: _PetDetailCard(
-                        name: 'Spencer',
-                        breed: 'Golden Retriever',
-                        imagePath: 'assets/dog.png',
-                        status: 'Vaccine Due',
-                        height: petCardHeight,
-                      ),
+                      child: const _PetDetailCard(height: petCardHeight),
                     ),
                     const SizedBox(width: 14),
                   ],
@@ -373,25 +370,70 @@ class _OutlinedPillButton extends StatelessWidget {
 }
 
 class _PetCircle extends StatelessWidget {
-  final String name;
-  final String imagePath;
-  const _PetCircle({required this.name, required this.imagePath});
+  const _PetCircle();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          width: 70,
-          height: 70,
-          child: Center(child: Image.asset(imagePath, height: 40)),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          name,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-      ],
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Column(
+        children: [
+          SizedBox(
+            width: 70,
+            height: 70,
+            child: Center(child: Image.asset('assets/dog.png', height: 40)),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Spencer',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('petInfos')
+          .where('userId', isEqualTo: user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String petName = 'Spencer';
+
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          // Try to find Spencer first, otherwise use the first pet
+          QueryDocumentSnapshot petDoc = snapshot.data!.docs.first;
+
+          // Look for Spencer
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final name = data['name'] as String?;
+            if (name != null && name.toLowerCase() == 'spencer') {
+              petDoc = doc;
+              break;
+            }
+          }
+
+          final data = petDoc.data() as Map<String, dynamic>;
+          petName = data['name'] as String? ?? 'Spencer';
+        }
+
+        return Column(
+          children: [
+            SizedBox(
+              width: 70,
+              height: 70,
+              child: Center(child: Image.asset('assets/dog.png', height: 40)),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              petName,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -413,7 +455,9 @@ class _AddCircle extends StatelessWidget {
           SizedBox(
             width: 72,
             height: 72,
-            child: Center(child: Image.asset('assets/add_post.png', height: 44)),
+            child: Center(
+              child: Image.asset('assets/add_post.png', height: 44),
+            ),
           ),
           const SizedBox(height: 6),
           const Text(
@@ -427,116 +471,260 @@ class _AddCircle extends StatelessWidget {
 }
 
 class _PetDetailCard extends StatelessWidget {
-  final String name;
-  final String breed;
-  final String imagePath;
-  final String status;
   final double height;
 
-  const _PetDetailCard({
-    required this.name,
-    required this.breed,
-    required this.imagePath,
-    required this.status,
-    this.height = 140,
-  });
+  const _PetDetailCard({this.height = 140});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      padding: const EdgeInsets.all(10),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFBDAFE0), width: 1.4),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: _mint,
-              borderRadius: BorderRadius.circular(4),
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Container(
+        height: height,
+        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFBDAFE0), width: 1.4),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: _mint,
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
-            child: Center(child: Image.asset(imagePath, height: 40)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+            const SizedBox(width: 12),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                ),
+              ),
+              child: Center(child: Image.asset('assets/dog.png', height: 40)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Spencer',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Golden Retriever',
+                    style: TextStyle(color: Colors.black54, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                    GestureDetector(
-                      onTap: () {},
-                      child: const Text(
-                        'Edit',
-                        style: TextStyle(
-                          color: _mint,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDE6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFD3C8FF)),
+                    ),
+                    child: const Text(
+                      'No concerns',
+                      style: TextStyle(
+                        color: Color(0xFF5C4DB3),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('petInfos')
+          .where('userId', isEqualTo: user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String petName = 'Spencer';
+        String petBreed = 'Golden Retriever';
+        String status = 'No concerns';
+        String? petId;
+
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          // Try to find Spencer first, otherwise use the first pet
+          QueryDocumentSnapshot petDoc = snapshot.data!.docs.first;
+
+          // Look for Spencer
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final name = data['name'] as String?;
+            if (name != null && name.toLowerCase() == 'spencer') {
+              petDoc = doc;
+              break;
+            }
+          }
+
+          final data = petDoc.data() as Map<String, dynamic>;
+          petName = data['name'] as String? ?? 'Spencer';
+          petBreed = data['breed'] as String? ?? 'Golden Retriever';
+          petId = petDoc.id;
+
+          // Get medical concerns for status
+          final medicalConcerns = data['medicalConcerns'] as List<dynamic>?;
+          if (medicalConcerns != null && medicalConcerns.isNotEmpty) {
+            // Show first concern or join them if multiple
+            status = medicalConcerns.map((e) => e.toString()).join(', ');
+            if (status.length > 30) {
+              status = '${status.substring(0, 27)}...';
+            }
+          } else {
+            status = 'No concerns';
+          }
+        }
+
+        return Container(
+          height: height,
+          padding: const EdgeInsets.all(10),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFBDAFE0), width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  color: _mint,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                  ),
+                ),
+                child: Center(child: Image.asset('assets/dog.png', height: 40)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            petName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditPetProfilePage(
+                                  petId: petId,
+                                  petName: petName,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: _mint,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      petBreed,
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDE6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFD3C8FF)),
+                      ),
+                      child: Text(
+                        status,
+                        style: const TextStyle(
+                          color: Color(0xFF5C4DB3),
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(breed,
-                    style:
-                        const TextStyle(color: Colors.black54, fontSize: 13)),
-                const SizedBox(height: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEDE6FF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFD3C8FF)),
-                  ),
-                  child: Text(
-                    status,
-                    style: const TextStyle(
-                      color: Color(0xFF5C4DB3),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

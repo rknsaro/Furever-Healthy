@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/login_page.dart';
 
 const _mint = Color(0xFF6F994A);
@@ -212,16 +213,113 @@ class AccountSessionPage extends StatelessWidget {
     );
 
     if (confirmed == true) {
-      // Static implementation - no actual deletion
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Delete account functionality is not yet implemented.',
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No user found. Please log in.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+            );
+          }
+          return;
+        }
+
+        final userId = user.uid;
+
+        // Show loading indicator
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) =>
+                const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        // Delete user data from Firestore collections
+        final firestore = FirebaseFirestore.instance;
+
+        // Get user's appointments first (needed for feedback deletion)
+        final appointmentsSnapshot = await firestore
+            .collection('user_appointments')
+            .where('userId', isEqualTo: userId)
+            .get();
+
+        final appointmentIds = appointmentsSnapshot.docs
+            .map((doc) => doc.id)
+            .toList();
+
+        // Delete user's feedback (linked to appointments)
+        for (var appointmentId in appointmentIds) {
+          final feedbackSnapshot = await firestore
+              .collection('feedback')
+              .where('appointmentId', isEqualTo: appointmentId)
+              .get();
+          for (var doc in feedbackSnapshot.docs) {
+            await doc.reference.delete();
+          }
+        }
+
+        // Delete user's appointments
+        for (var doc in appointmentsSnapshot.docs) {
+          await doc.reference.delete();
+        }
+
+        // Delete user's vaccines
+        final vaccinesSnapshot = await firestore
+            .collection('vaccines')
+            .where('userId', isEqualTo: userId)
+            .get();
+        for (var doc in vaccinesSnapshot.docs) {
+          await doc.reference.delete();
+        }
+
+        // Delete from users collection
+        await firestore.collection('users').doc(userId).delete();
+
+        // Delete the Firebase Auth account
+        await user.delete();
+
+        // Close loading dialog
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+
+        // Navigate to login page
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account deleted successfully.'),
+              backgroundColor: Colors.green,
             ),
-            backgroundColor: Colors.orange,
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        // Close loading dialog if still open
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting account: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

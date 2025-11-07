@@ -3,6 +3,7 @@ import 'package:fureverhealthy/book_appointment.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -521,6 +522,10 @@ class _AppointmentPageState extends State<AppointmentPage> {
         statusColor = Colors.red;
         displayStatus = 'Cancelled';
         break;
+      case 'completed':
+        statusColor = Colors.blue;
+        displayStatus = 'Completed';
+        break;
       case 'pending':
         statusColor = Colors.orange;
         displayStatus = 'Pending';
@@ -548,9 +553,24 @@ class _AppointmentPageState extends State<AppointmentPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with status
+          // Pet and Owner Info with status on the right
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Row(
+                children: [
+                  const Icon(Icons.pets, color: _mint, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pet: $petName',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _mintDark,
+                    ),
+                  ),
+                ],
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -568,25 +588,6 @@ class _AppointmentPageState extends State<AppointmentPage> {
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
-                ),
-              ),
-              // Users can only view status, not change it
-              // Vets will manage status through their own interface
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Pet and Owner Info
-          Row(
-            children: [
-              const Icon(Icons.pets, color: _mint, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Pet: $petName',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _mintDark,
                 ),
               ),
             ],
@@ -688,6 +689,199 @@ class _AppointmentPageState extends State<AppointmentPage> {
               ),
             ],
           ),
+
+          // Online Consultation Join Button or Waiting Message
+          if (appointmentType.toLowerCase().contains('online') ||
+              appointmentType == 'Online Consultation') ...[
+            const Divider(height: 24),
+            _buildOnlineConsultationSection(
+              normalizedStatus,
+              appointment['meetingLink'] as String?,
+            ),
+          ],
+
+          // Feedback section for completed appointments
+          if (normalizedStatus == 'completed') ...[
+            const Divider(height: 24),
+            _buildFeedbackSection(appointmentId, appointment),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOnlineConsultationSection(String status, String? meetingLink) {
+    if (status == 'pending') {
+      // Show waiting message when status is pending
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.access_time, color: Colors.orange, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'Waiting for vet confirmation...',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (status == 'confirmed') {
+      // Show Join Consultation button when confirmed
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _joinOnlineMeeting(meetingLink),
+          icon: const Icon(Icons.video_camera_front, color: Colors.white),
+          label: const Text(
+            'Join Consultation',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _mint,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
+      );
+    } else {
+      // For other statuses (declined, cancelled, completed), don't show anything
+      return const SizedBox.shrink();
+    }
+  }
+
+  Future<void> _joinOnlineMeeting(String? meetingLink) async {
+    if (meetingLink == null || meetingLink.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Meeting link not available. Please contact the vet.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final Uri url = Uri.parse(meetingLink);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Could not open meeting link. Please check the link.',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error opening meeting: $e')));
+      }
+    }
+  }
+
+  Widget _buildFeedbackSection(
+    String appointmentId,
+    Map<String, dynamic> appointment,
+  ) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('feedback')
+          .where('appointmentId', isEqualTo: appointmentId)
+          .limit(1)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+
+        // Check if feedback already exists
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          final feedbackData =
+              snapshot.data!.docs.first.data() as Map<String, dynamic>;
+          return _buildExistingFeedback(feedbackData);
+        }
+
+        // Show feedback form if no feedback exists
+        return _FeedbackForm(
+          appointmentId: appointmentId,
+          userName: appointment['userName'] ?? 'Unknown User',
+          vetName: appointment['vetName'] ?? 'Unknown Vet',
+        );
+      },
+    );
+  }
+
+  Widget _buildExistingFeedback(Map<String, dynamic> feedbackData) {
+    final rating = feedbackData['rating'] as int? ?? 0;
+    final feedbackText = feedbackData['Feedback'] as String? ?? '';
+    final date = feedbackData['date'] as Timestamp?;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _mint.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _mint.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Your Feedback',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _mintDark,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(5, (index) {
+              return Icon(
+                index < rating ? Icons.star : Icons.star_border,
+                color: Colors.amber,
+                size: 20,
+              );
+            }),
+          ),
+          if (feedbackText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              feedbackText,
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+          ],
+          if (date != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              DateFormat('MMM d, yyyy').format(date.toDate()),
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            ),
+          ],
         ],
       ),
     );
@@ -881,6 +1075,231 @@ class _AppointmentPageState extends State<AppointmentPage> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Feedback Form Widget
+class _FeedbackForm extends StatefulWidget {
+  final String appointmentId;
+  final String userName;
+  final String vetName;
+
+  const _FeedbackForm({
+    required this.appointmentId,
+    required this.userName,
+    required this.vetName,
+  });
+
+  @override
+  State<_FeedbackForm> createState() => _FeedbackFormState();
+}
+
+class _FeedbackFormState extends State<_FeedbackForm> {
+  int _rating = 0;
+  final TextEditingController _feedbackController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.userName;
+  }
+
+  @override
+  void dispose() {
+    _feedbackController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitFeedback() async {
+    if (_rating == 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a rating')));
+      return;
+    }
+
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter your name')));
+      return;
+    }
+
+    if (_feedbackController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your feedback')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('feedback').add({
+        'appointmentId': widget.appointmentId,
+        'rating': _rating,
+        'Name': _nameController.text.trim(),
+        'Feedback': _feedbackController.text.trim(),
+        'date': Timestamp.now(),
+        'vetName': widget.vetName,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thank you for your feedback!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error submitting feedback: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _mint.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _mint.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Share Your Feedback',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: _mintDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Star Rating
+          const Text(
+            'Rating:',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: List.generate(5, (index) {
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _rating = index + 1;
+                  });
+                },
+                child: Icon(
+                  index < _rating ? Icons.star : Icons.star_border,
+                  color: Colors.amber,
+                  size: 32,
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+
+          // Name field
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'Your Name',
+              hintText: 'Enter your name',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Feedback text field
+          TextField(
+            controller: _feedbackController,
+            maxLines: 4,
+            maxLength: 500,
+            decoration: InputDecoration(
+              labelText: 'Feedback',
+              hintText: 'Share your experience...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+            onChanged: (value) {
+              setState(() {}); // Update counter
+            },
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) {
+                  return Text(
+                    '$currentLength/$maxLength',
+                    style: TextStyle(
+                      color: currentLength > maxLength!
+                          ? Colors.red
+                          : Colors.grey,
+                    ),
+                  );
+                },
+          ),
+          const SizedBox(height: 12),
+
+          // Submit button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _submitFeedback,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _mint,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Submit Feedback',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
           ),
         ],
       ),
