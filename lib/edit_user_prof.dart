@@ -94,7 +94,6 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
   String? _currentProfileImageUrl;
   bool _obscurePassword = true;
   bool _isLoading = false;
-  String _originalPasswordMask = '**********';
 
   @override
   void initState() {
@@ -123,23 +122,31 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
 
         if (userDoc.exists) {
           final data = userDoc.data()!;
-          String phoneNumber = data['phoneNumber'] ?? '';
+          final name = (data['name'] as String?)?.trim() ?? '';
+          final email =
+              (data['email'] as String?)?.trim() ?? (user.email ?? '');
+          final username = _sanitizeTextField(data['username'] as String?);
+          String phoneNumber = _sanitizeTextField(
+            data['phoneNumber'] as String?,
+          );
+
           // Ensure phone number starts with +63 if it's a valid number
           if (phoneNumber.isNotEmpty && !phoneNumber.startsWith('+63')) {
-            // If it's just digits, add +63 prefix
             if (RegExp(r'^\d+$').hasMatch(phoneNumber)) {
               phoneNumber = '+63$phoneNumber';
             } else if (phoneNumber.startsWith('63') &&
                 phoneNumber.length >= 10) {
-              phoneNumber = '+${phoneNumber}';
+              phoneNumber = '+$phoneNumber';
             }
           }
+
           setState(() {
-            _nameController.text = data['name'] ?? '';
-            _usernameController.text = data['username'] ?? '';
+            _nameController.text = name;
+            _usernameController.text = username;
             _phoneController.text = phoneNumber;
-            _emailController.text = data['email'] ?? user.email ?? '';
-            _passwordController.text = _originalPasswordMask; // Masked password
+            _emailController.text = email;
+            _passwordController.clear();
+            _obscurePassword = true;
             _currentProfileImageUrl = data['profileImageUrl'] as String?;
           });
         }
@@ -147,6 +154,18 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
         print('Error loading user data: $e');
       }
     }
+  }
+
+  String _sanitizeTextField(String? value) {
+    if (value == null) return '';
+    final trimmed = value.trim();
+    if (trimmed.isEmpty ||
+        trimmed.toLowerCase() == 'n/a' ||
+        trimmed.toLowerCase() == 'none' ||
+        trimmed.toLowerCase() == 'not set') {
+      return '';
+    }
+    return trimmed;
   }
 
   Future<void> _pickProfileImage() async {
@@ -251,23 +270,29 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
       }
 
       // Update Firestore
-      final updateData = <String, dynamic>{
-        'name': _nameController.text.trim(),
-        'username': _usernameController.text.trim(),
-        'phoneNumber': _phoneController.text.trim(),
-        'email': _emailController.text.trim(),
-      };
+      final name = _nameController.text.trim();
+      final username = _usernameController.text.trim();
+      final phoneNumber = _phoneController.text.trim();
+      final email = _emailController.text.trim();
+
+      final updateData = <String, dynamic>{'name': name, 'email': email};
+
+      updateData['username'] = username.isNotEmpty
+          ? username
+          : FieldValue.delete();
+      updateData['phoneNumber'] = phoneNumber.isNotEmpty
+          ? phoneNumber
+          : FieldValue.delete();
 
       if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
         updateData['profileImageUrl'] = profileImageUrl;
       }
 
       // Update password if changed (not masked)
-      if (_passwordController.text != _originalPasswordMask &&
-          _passwordController.text.isNotEmpty &&
-          _passwordController.text.length >= 6) {
+      final newPassword = _passwordController.text.trim();
+      if (newPassword.isNotEmpty && newPassword.length >= 6) {
         try {
-          await user.updatePassword(_passwordController.text.trim());
+          await user.updatePassword(newPassword);
           print('Password updated successfully');
         } catch (e) {
           print('Password update error: $e');
@@ -358,6 +383,7 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
     bool showToggle = false,
     List<TextInputFormatter>? inputFormatters,
     TextInputType? keyboardType,
+    String? hintText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,6 +403,7 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
           keyboardType: keyboardType ?? TextInputType.text,
           inputFormatters: inputFormatters,
           decoration: InputDecoration(
+            hintText: hintText,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade300),
@@ -458,30 +485,70 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
                     // Profile Picture
                     GestureDetector(
                       onTap: _pickProfileImage,
-                      child: Container(
-                        width: 130,
-                        height: 130,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: _mint, width: 3),
-                          image: _pickedPhoto != null || _pickedBytes != null
-                              ? DecorationImage(
-                                  image: kIsWeb && _pickedBytes != null
-                                      ? MemoryImage(_pickedBytes!)
-                                      : FileImage(File(_pickedPhoto!.path))
-                                            as ImageProvider,
-                                  fit: BoxFit.cover,
-                                )
-                              : _currentProfileImageUrl != null
-                              ? DecorationImage(
-                                  image: NetworkImage(_currentProfileImageUrl!),
-                                  fit: BoxFit.cover,
-                                )
-                              : const DecorationImage(
-                                  image: AssetImage('assets/user_prof.png'),
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 130,
+                            height: 130,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: _mint, width: 3),
+                              image:
+                                  _pickedPhoto != null || _pickedBytes != null
+                                  ? DecorationImage(
+                                      image: kIsWeb && _pickedBytes != null
+                                          ? MemoryImage(_pickedBytes!)
+                                          : FileImage(File(_pickedPhoto!.path))
+                                                as ImageProvider,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : _currentProfileImageUrl != null
+                                  ? DecorationImage(
+                                      image: NetworkImage(
+                                        _currentProfileImageUrl!,
+                                      ),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : const DecorationImage(
+                                      image: AssetImage('assets/user_prof.png'),
+                                      fit: BoxFit.cover,
+                                    ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(.15),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                Icons.camera_alt_outlined,
+                                color: _mint,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Tap to change photo',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -491,11 +558,13 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
                       label: 'Name',
                       controller: _nameController,
                       icon: Icons.edit_outlined,
+                      hintText: 'Enter your full name',
                     ),
                     _buildTextField(
                       label: 'Username',
                       controller: _usernameController,
                       icon: Icons.edit_outlined,
+                      hintText: 'Choose a unique username',
                     ),
                     _buildTextField(
                       label: 'Phone Number',
@@ -503,11 +572,13 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
                       icon: Icons.edit_outlined,
                       keyboardType: TextInputType.phone,
                       inputFormatters: [PhilippinesPhoneFormatter()],
+                      hintText: 'Add your phone number',
                     ),
                     _buildTextField(
                       label: 'Email',
                       controller: _emailController,
                       icon: Icons.edit_outlined,
+                      hintText: 'Update your email address',
                     ),
                     _buildTextField(
                       label: 'Password',
@@ -515,6 +586,7 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
                       icon: Icons.edit_outlined,
                       obscureText: true,
                       showToggle: true,
+                      hintText: 'Enter a new password (min 6 characters)',
                     ),
 
                     const SizedBox(height: 24),

@@ -1,12 +1,18 @@
-import 'package:flutter/material.dart';
+import 'dart:io' show File;
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 const _mint = Color(0xFF6F994A);
 
 class EditPetProfilePage extends StatefulWidget {
-  final String? petId; // Optional pet ID for editing existing pet
-  final String? petName; // Optional pet name for editing existing pet
+  final String? petId;
+  final String? petName;
 
   const EditPetProfilePage({super.key, this.petId, this.petName});
 
@@ -19,12 +25,22 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
   final TextEditingController _breedController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
   final List<String> _medicalConcerns = [];
+  final ImagePicker _picker = ImagePicker();
 
-  String? _gender; // 'Male' or 'Female'
-  String? _speciesType; // 'Cat' or 'Dog'
-  String? _spayedNeutered; // 'Yes' or 'No'
+  String? _gender;
+  String? _speciesType;
+  String? _spayedNeutered;
   bool _isLoading = false;
   bool _isLoadingData = true;
+  bool _isUploadingImage = false;
+  bool _isDeleting = false;
+
+  XFile? _pickedPhoto;
+  Uint8List? _pickedBytes;
+  String? _imageUrl;
+  String? _imageAsset;
+  String? _imageStoragePath;
+  String? _petDocumentId;
 
   @override
   void initState() {
@@ -36,47 +52,36 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        // Set default values if no user
         _setDefaultValues();
         setState(() => _isLoadingData = false);
         return;
       }
 
-      QuerySnapshot? querySnapshot;
       if (widget.petId != null) {
-        final doc = await FirebaseFirestore.instance
+        final docRef = FirebaseFirestore.instance
             .collection('petInfos')
-            .doc(widget.petId)
-            .get();
-        if (doc.exists) {
-          final docData = doc.data();
-          if (docData != null) {
-            _populateFields(Map<String, dynamic>.from(docData));
-          } else {
-            _setDefaultValues();
-          }
+            .doc(widget.petId);
+        final doc = await docRef.get();
+        if (doc.exists && doc.data() != null) {
+          _petDocumentId = doc.id;
+          _populateFields(Map<String, dynamic>.from(doc.data()!));
         } else {
           _setDefaultValues();
         }
       } else {
-        // Try to find pet by name, or default to Spencer
         final petName = widget.petName ?? 'Spencer';
-        querySnapshot = await FirebaseFirestore.instance
+        final query = await FirebaseFirestore.instance
             .collection('petInfos')
             .where('userId', isEqualTo: user.uid)
             .where('name', isEqualTo: petName)
             .limit(1)
             .get();
 
-        if (querySnapshot.docs.isNotEmpty) {
-          final docData = querySnapshot.docs.first.data();
-          if (docData != null && docData is Map) {
-            _populateFields(Map<String, dynamic>.from(docData));
-          } else {
-            _setDefaultValues(petName);
-          }
+        if (query.docs.isNotEmpty) {
+          final docSnapshot = query.docs.first;
+          _petDocumentId = docSnapshot.id;
+          _populateFields(Map<String, dynamic>.from(docSnapshot.data()));
         } else {
-          // No pet found, use default values
           _setDefaultValues(petName);
         }
       }
@@ -96,6 +101,11 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
     _speciesType = 'Dog';
     _spayedNeutered = 'No';
     _medicalConcerns.clear();
+    _medicalConcerns.add('Dental Diseases');
+    _imageAsset = 'assets/spencer.jpeg';
+    _imageUrl = null;
+    _imageStoragePath = null;
+    _petDocumentId = null;
   }
 
   void _populateFields(Map<String, dynamic> data) {
@@ -106,9 +116,101 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
     _speciesType = data['speciesType'] ?? 'Dog';
     _spayedNeutered = data['spayedNeutered'] ?? 'No';
     if (data['medicalConcerns'] != null) {
-      _medicalConcerns.clear();
-      _medicalConcerns.addAll(List<String>.from(data['medicalConcerns']));
+      _medicalConcerns
+        ..clear()
+        ..addAll(List<String>.from(data['medicalConcerns']));
     }
+    _imageUrl = data['imageUrl'] as String?;
+    _imageAsset = data['imageAsset'] as String?;
+    _imageStoragePath = data['imageStoragePath'] as String?;
+  }
+
+  Future<void> _pickNewPhoto() async {
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+
+      if (kIsWeb) {
+        final bytes = await file.readAsBytes();
+        setState(() {
+          _pickedPhoto = file;
+          _pickedBytes = bytes;
+        });
+      } else {
+        setState(() {
+          _pickedPhoto = file;
+          _pickedBytes = null;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to select photo: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Widget _buildPlaceholderAvatar(double size) {
+    return Container(
+      width: size,
+      height: size,
+      color: Colors.white,
+      alignment: Alignment.center,
+      child: Image.asset(
+        'assets/dog.png',
+        width: size * 0.6,
+        height: size * 0.6,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
+  Widget _buildEditableAvatarContent(double size) {
+    if (_pickedBytes != null) {
+      return Image.memory(
+        _pickedBytes!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      );
+    }
+
+    if (_pickedPhoto != null && !kIsWeb) {
+      return Image.file(
+        File(_pickedPhoto!.path),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      );
+    }
+
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      return Image.network(
+        _imageUrl!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPlaceholderAvatar(size),
+      );
+    }
+
+    if (_imageAsset != null && _imageAsset!.isNotEmpty) {
+      return Image.asset(
+        _imageAsset!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildPlaceholderAvatar(size),
+      );
+    }
+
+    return _buildPlaceholderAvatar(size);
   }
 
   Future<void> _savePetData() async {
@@ -119,33 +221,93 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _isUploadingImage = _pickedPhoto != null || _pickedBytes != null;
+    });
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please log in to save pet data')),
-          );
+      if (user == null) return;
+
+      String? updatedImageUrl = _imageUrl;
+      String? updatedImageStoragePath = _imageStoragePath;
+      String? updatedImageAsset = _imageAsset;
+
+      if (_pickedPhoto != null || _pickedBytes != null) {
+        try {
+          if (_imageStoragePath != null && _imageStoragePath!.isNotEmpty) {
+            try {
+              await FirebaseStorage.instance.ref(_imageStoragePath!).delete();
+            } catch (e) {
+              print('Failed to delete old image: $e');
+            }
+          }
+
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final storagePath = 'pet_images/${user.uid}/$timestamp.jpg';
+          final storageRef = FirebaseStorage.instance.ref(storagePath);
+
+          UploadTask uploadTask;
+          if (_pickedBytes != null) {
+            uploadTask = storageRef.putData(
+              _pickedBytes!,
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+          } else {
+            final file = File(_pickedPhoto!.path);
+            uploadTask = storageRef.putFile(
+              file,
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+          }
+
+          final snapshot = await uploadTask.whenComplete(() {});
+          updatedImageUrl = await snapshot.ref.getDownloadURL();
+          updatedImageStoragePath = storagePath;
+          updatedImageAsset = null;
+        } catch (e) {
+          print('Error uploading new pet photo: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to upload photo: $e'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
         }
-        return;
       }
 
-      final petName = _nameController.text.trim();
       final petData = {
         'userId': user.uid,
-        'name': petName,
+        'name': _nameController.text.trim(),
         'breed': _breedController.text.trim(),
         'gender': _gender ?? 'Male',
         'speciesType': _speciesType ?? 'Dog',
         'weight': _weightController.text.trim(),
         'spayedNeutered': _spayedNeutered ?? 'No',
         'medicalConcerns': _medicalConcerns,
-        'imageAsset': 'assets/spencer.jpeg', // Using spencer.jpeg as specified
         'updatedAt': FieldValue.serverTimestamp(),
       };
+
+      if (updatedImageUrl != null) {
+        petData['imageUrl'] = updatedImageUrl;
+      } else {
+        petData.remove('imageUrl');
+      }
+
+      if (updatedImageStoragePath != null) {
+        petData['imageStoragePath'] = updatedImageStoragePath;
+      } else {
+        petData.remove('imageStoragePath');
+      }
+
+      if (updatedImageAsset != null) {
+        petData['imageAsset'] = updatedImageAsset;
+      } else {
+        petData['imageAsset'] = FieldValue.delete();
+      }
 
       DocumentReference docRef;
 
@@ -154,29 +316,36 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
         docRef = FirebaseFirestore.instance
             .collection('petInfos')
             .doc(widget.petId);
+        petData['petID'] = docRef.id;
         await docRef.update(petData);
+        _petDocumentId = docRef.id;
         print('Updated pet with ID: ${widget.petId}');
       } else {
         // Check if pet with this name exists for this user
         final querySnapshot = await FirebaseFirestore.instance
             .collection('petInfos')
             .where('userId', isEqualTo: user.uid)
-            .where('name', isEqualTo: petName)
+            .where('name', isEqualTo: _nameController.text.trim())
             .limit(1)
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
           // Update existing pet
           docRef = querySnapshot.docs.first.reference;
+          petData['petID'] = docRef.id;
           await docRef.update(petData);
-          print('Updated existing pet: $petName');
+          _petDocumentId = docRef.id;
+          print('Updated existing pet: ${_nameController.text.trim()}');
         } else {
           // Create new pet
           petData['createdAt'] = FieldValue.serverTimestamp();
-          docRef = await FirebaseFirestore.instance
-              .collection('petInfos')
-              .add(petData);
-          print('Created new pet: $petName with ID: ${docRef.id}');
+          docRef = FirebaseFirestore.instance.collection('petInfos').doc();
+          petData['petID'] = docRef.id;
+          await docRef.set(petData);
+          _petDocumentId = docRef.id;
+          print(
+            'Created new pet: ${_nameController.text.trim()} with ID: ${docRef.id}',
+          );
         }
       }
 
@@ -187,7 +356,12 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        _pickedPhoto = null;
+        _pickedBytes = null;
+        _imageUrl = updatedImageUrl;
+        _imageStoragePath = updatedImageStoragePath;
+        _imageAsset = updatedImageAsset;
+        Navigator.pop(context, true);
       }
     } catch (e, stackTrace) {
       print('Error saving pet data: $e');
@@ -203,211 +377,143 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isUploadingImage = false;
+        });
       }
     }
   }
 
-  Future<void> _removePet() async {
+  Future<void> _confirmDeletePet() async {
+    if (_petDocumentId == null && widget.petId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pet to remove.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+      builder: (context) => AlertDialog(
+        title: const Text('Remove pet'),
+        content: const Text(
+          'Are you sure you want to remove this pet permanently?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-          title: const Text(
-            'Remove Pet',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove', style: TextStyle(color: Colors.white)),
           ),
-          content: const Text(
-            'Are you sure you want to remove this pet? This action cannot be undone.',
-            style: TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Remove',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
 
     if (confirmed == true) {
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) return;
+      await _deletePet();
+    }
+  }
 
-        if (widget.petId != null) {
-          await FirebaseFirestore.instance
-              .collection('petInfos')
-              .doc(widget.petId)
-              .delete();
-        } else if (widget.petName != null) {
-          final querySnapshot = await FirebaseFirestore.instance
-              .collection('petInfos')
-              .where('userId', isEqualTo: user.uid)
-              .where('name', isEqualTo: widget.petName)
-              .limit(1)
-              .get();
+  Future<void> _deletePet() async {
+    setState(() => _isDeleting = true);
 
-          if (querySnapshot.docs.isNotEmpty) {
-            await querySnapshot.docs.first.reference.delete();
-          }
-        }
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('You need to be signed in to remove a pet.');
+      }
 
-        if (mounted) {
-          Navigator.pop(context, true);
+      String? documentId = _petDocumentId ?? widget.petId;
+      DocumentReference<Map<String, dynamic>>? docRef;
+
+      if (documentId != null) {
+        docRef = FirebaseFirestore.instance
+            .collection('petInfos')
+            .doc(documentId);
+        final doc = await docRef.get();
+        if (!doc.exists) {
+          docRef = null;
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error removing pet: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+      }
+
+      if (docRef == null) {
+        final query = await FirebaseFirestore.instance
+            .collection('petInfos')
+            .where('userId', isEqualTo: user.uid)
+            .where('name', isEqualTo: _nameController.text.trim())
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          docRef = query.docs.first.reference;
         }
+      }
+
+      if (docRef == null) {
+        throw Exception('Could not find this pet in the database.');
+      }
+
+      if (_imageStoragePath != null && _imageStoragePath!.isNotEmpty) {
+        try {
+          await FirebaseStorage.instance.ref(_imageStoragePath!).delete();
+        } catch (e) {
+          print('Failed to delete image from storage: $e');
+        }
+      }
+
+      await docRef.delete();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pet removed successfully.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pop(context, true);
+    } catch (e) {
+      print('Error deleting pet: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove pet: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
       }
     }
   }
 
-  void _showGenderPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Male'),
-              leading: Radio<String>(
-                value: 'Male',
-                groupValue: _gender,
-                onChanged: (value) {
-                  setState(() => _gender = value);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-            ListTile(
-              title: const Text('Female'),
-              leading: Radio<String>(
-                value: 'Female',
-                groupValue: _gender,
-                onChanged: (value) {
-                  setState(() => _gender = value);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _toggleGender() {
+    setState(() {
+      _gender = _gender == 'Male' ? 'Female' : 'Male';
+    });
   }
 
-  void _showSpeciesPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Cat'),
-              leading: Radio<String>(
-                value: 'Cat',
-                groupValue: _speciesType,
-                onChanged: (value) {
-                  setState(() => _speciesType = value);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-            ListTile(
-              title: const Text('Dog'),
-              leading: Radio<String>(
-                value: 'Dog',
-                groupValue: _speciesType,
-                onChanged: (value) {
-                  setState(() => _speciesType = value);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _toggleSpeciesType() {
+    setState(() {
+      _speciesType = _speciesType == 'Dog' ? 'Cat' : 'Dog';
+    });
   }
 
-  void _showSpayedNeuteredPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Yes'),
-              leading: Radio<String>(
-                value: 'Yes',
-                groupValue: _spayedNeutered,
-                onChanged: (value) {
-                  setState(() => _spayedNeutered = value);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-            ListTile(
-              title: const Text('No'),
-              leading: Radio<String>(
-                value: 'No',
-                groupValue: _spayedNeutered,
-                onChanged: (value) {
-                  setState(() => _spayedNeutered = value);
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void _toggleSpayedNeutered() {
+    setState(() {
+      _spayedNeutered = _spayedNeutered == 'Yes' ? 'No' : 'Yes';
+    });
   }
 
   void _showAddConcernDialog() {
@@ -430,19 +536,14 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _mint),
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
-                setState(() {
-                  _medicalConcerns.add(controller.text.trim());
-                });
+                setState(() => _medicalConcerns.add(controller.text.trim()));
                 Navigator.pop(context);
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _mint,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Add'),
+            child: const Text('Add', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -450,21 +551,11 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
   }
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _breedController.dispose();
-    _weightController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: _mint,
-        body: const Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
@@ -472,41 +563,55 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: _mint,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Edit Pet Profile',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        centerTitle: false,
         elevation: 0,
+        foregroundColor: Colors.white,
+        title: const Text('Edit Pet Profile'),
       ),
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const SizedBox(height: 20),
-            // Pet Profile Image
+            const SizedBox(height: 10),
             Center(
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _mint, width: 3),
-                ),
-                child: ClipOval(
-                  child: Image.asset('assets/spencer.jpeg', fit: BoxFit.cover),
+              child: CircleAvatar(
+                radius: 60,
+                backgroundColor: _mint.withOpacity(0.2),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    ClipOval(
+                      child: SizedBox(
+                        width: 112,
+                        height: 112,
+                        child: _buildEditableAvatarContent(112),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -4,
+                      right: -4,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        style: IconButton.styleFrom(backgroundColor: _mint),
+                        onPressed: _pickNewPhoto,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 30),
+            if (_isUploadingImage) ...[
+              const SizedBox(height: 10),
+              const CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(_mint),
+              ),
+            ],
+            const SizedBox(height: 24),
 
-            // Basic information
             _buildSection('Basic information', [
               _buildTextFieldWithCounter(
                 label: 'Name',
@@ -514,23 +619,18 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
                 maxLength: 120,
               ),
               const SizedBox(height: 16),
-              _buildSelectableField(
-                label: 'Gender',
-                value: _gender ?? 'Male',
-                onTap: _showGenderPicker,
-              ),
+              _buildSelectableField('Gender', _gender ?? 'Male', _toggleGender),
               const SizedBox(height: 16),
               _buildTextField(label: 'Weight', controller: _weightController),
             ]),
 
             const SizedBox(height: 24),
 
-            // Species
             _buildSection('Species', [
               _buildSelectableField(
-                label: 'Type',
-                value: _speciesType ?? 'Dog',
-                onTap: _showSpeciesPicker,
+                'Type',
+                _speciesType ?? 'Dog',
+                _toggleSpeciesType,
               ),
               const SizedBox(height: 16),
               _buildTextFieldWithCounter(
@@ -542,25 +642,23 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
 
             const SizedBox(height: 24),
 
-            // Other info
-            _buildSection('Other info', [
+            _buildSection('Other Info', [
               _buildSelectableField(
-                label: 'Spayed or Neutered?',
-                value: _spayedNeutered ?? 'No',
-                onTap: _showSpayedNeuteredPicker,
+                'Spayed or Neutered?',
+                _spayedNeutered ?? 'No',
+                _toggleSpayedNeutered,
               ),
             ]),
 
             const SizedBox(height: 24),
 
-            // Medical Concerns
             _buildSection('Medical Concerns', [
               Wrap(
                 spacing: 8,
-                runSpacing: 8,
+                // runSpacing: 8,
                 children: [
                   ..._medicalConcerns.map(
-                    (concern) => Container(
+                    (c) => Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
@@ -570,10 +668,7 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade300),
                       ),
-                      child: Text(
-                        concern,
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                      child: Text(c, style: const TextStyle(fontSize: 14)),
                     ),
                   ),
                   GestureDetector(
@@ -606,19 +701,17 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
 
             const SizedBox(height: 40),
 
-            // Save Changes Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _savePetData,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _mint,
-                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                onPressed: _isLoading ? null : _savePetData,
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,
@@ -633,27 +726,38 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
                     : const Text(
                         'Save Changes',
                         style: TextStyle(
-                          fontSize: 16,
+                          color: Colors.white,
                           fontWeight: FontWeight.w600,
+                          fontSize: 16,
                         ),
                       ),
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // Remove pet
             Center(
               child: TextButton(
-                onPressed: _removePet,
-                child: const Text(
-                  'Remove pet',
-                  style: TextStyle(color: Colors.red, fontSize: 14),
-                ),
+                onPressed: _isDeleting ? null : _confirmDeletePet,
+                child: _isDeleting
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.redAccent,
+                          ),
+                        ),
+                      )
+                    : const Text(
+                        'Remove pet',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
-
-            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -667,13 +771,55 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
         Text(
           title,
           style: const TextStyle(
-            fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         const SizedBox(height: 12),
         ...children,
+      ],
+    );
+  }
+
+  Widget _buildSelectableField(String label, String value, VoidCallback onTap) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+            ),
+            GestureDetector(
+              onTap: onTap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: _mint,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -753,6 +899,7 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
+            counterText: '',
             contentPadding: const EdgeInsets.symmetric(
               vertical: 14,
               horizontal: 12,
@@ -769,54 +916,8 @@ class _EditPetProfilePageState extends State<EditPetProfilePage> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: _mint),
             ),
-            counterText: '',
           ),
-          onChanged: (value) => setState(() {}),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSelectableField({
-    required String label,
-    required String value,
-    required VoidCallback onTap,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-            color: Colors.black87,
-          ),
-        ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-            decoration: BoxDecoration(
-              color: _mint,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Icon(Icons.arrow_drop_down, color: Colors.white),
-              ],
-            ),
-          ),
+          onChanged: (_) => setState(() {}),
         ),
       ],
     );

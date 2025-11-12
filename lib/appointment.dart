@@ -64,6 +64,17 @@ class _AppointmentPageState extends State<AppointmentPage> {
 
         for (var doc in snapshot.docs) {
           final data = doc.data() as Map<String, dynamic>;
+          final String status =
+              (data['status'] as String?) ??
+              (data['availability'] as String?) ??
+              (data['availabilityStatus'] as String?) ??
+              ((data['isAvailable'] is bool)
+                  ? ((data['isAvailable'] as bool)
+                        ? 'Available'
+                        : 'Unavailable')
+                  : null) ??
+              'Available';
+
           final vet = {
             'vetId': doc.id, // Store the document ID as vetId
             'name': data['name'] ?? data['displayName'] ?? 'Unknown Vet',
@@ -75,6 +86,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
                       : 5),
             'location': data['location'] ?? 'Unknown',
             'verified': data['verified'] ?? true,
+            'status': status,
           };
           vets.add(vet);
 
@@ -401,6 +413,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
                             vet['specialty'],
                             vet['rating'],
                             vet['location'],
+                            vet['status'] as String? ?? 'Available',
                             vet['vetId'] as String,
                           ),
                         ),
@@ -558,6 +571,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.pets, color: _mint, size: 20),
                   const SizedBox(width: 8),
@@ -947,136 +961,253 @@ class _AppointmentPageState extends State<AppointmentPage> {
     String specialty,
     int rating,
     String location,
+    String status,
     String vetId,
   ) {
+    final String normalizedStatus = status.trim().isEmpty
+        ? 'Available'
+        : status.trim();
+    final bool isUnavailable = normalizedStatus.toLowerCase() == 'unavailable';
+    final Color statusColor = isUnavailable ? Colors.red : Colors.green;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _mint.withOpacity(0.35)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Vet icon
-          Container(
-            width: 55,
-            height: 55,
-            decoration: BoxDecoration(
-              color: _mint.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: const Icon(Icons.person, size: 30, color: _mintDark),
-          ),
-          const SizedBox(width: 15),
-
-          // Vet info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 5 Star Rating at the top
-                Row(
-                  children: List.generate(
-                    rating,
-                    (index) =>
-                        const Icon(Icons.star, color: Colors.amber, size: 18),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Name
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _mintDark,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                // Specialty
-                Text(
-                  specialty,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                ),
-                const SizedBox(height: 4),
-                // Location
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, color: _mint, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      location,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                // License Verified
-                Row(
-                  children: const [
-                    Icon(Icons.verified, color: _mint, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'License Verified',
-                      style: TextStyle(color: Colors.black54, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Book Now Button with white text
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _mint,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 8,
-                  ),
+              Container(
+                width: 6,
+                decoration: BoxDecoration(
+                  color: _mint,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => BookAppointmentPage(
-                        vetId: vetId,
-                        vetName: name,
-                        vetSpecialty: specialty,
-                        vetRating: rating,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: _mintDark,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                specialty,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    color: _mint,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      location,
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: const [
+                                  Text(
+                                    'License Verified',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '(',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Icon(Icons.verified, color: _mint, size: 16),
+                                  Text(
+                                    ')',
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: statusColor.withOpacity(0.4),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.circle, color: statusColor, size: 10),
+                              const SizedBox(width: 6),
+                              Text(
+                                normalizedStatus,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: List.generate(
+                        rating,
+                        (index) => const Padding(
+                          padding: EdgeInsets.only(right: 2),
+                          child: Icon(
+                            Icons.star,
+                            color: Colors.green,
+                            size: 18,
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                },
-                child: const Text(
-                  'Book Now',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _mint,
+                              side: const BorderSide(color: _mint),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                            ),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Profile for $name coming soon.',
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  backgroundColor: _mintDark,
+                                  duration: const Duration(milliseconds: 1800),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'View Profile',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isUnavailable
+                                  ? Colors.grey.shade400
+                                  : _mint,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                            ),
+                            onPressed: isUnavailable
+                                ? null
+                                : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            BookAppointmentPage(
+                                              vetId: vetId,
+                                              vetName: name,
+                                              vetSpecialty: specialty,
+                                              vetRating: rating,
+                                              vetStatus: normalizedStatus,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                            child: const Text(
+                              'Book Appointment',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isUnavailable)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Currently unavailable',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

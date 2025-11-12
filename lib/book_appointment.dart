@@ -12,6 +12,7 @@ class BookAppointmentPage extends StatefulWidget {
   final String vetName;
   final String vetSpecialty;
   final int vetRating;
+  final String vetStatus;
 
   const BookAppointmentPage({
     super.key,
@@ -19,6 +20,7 @@ class BookAppointmentPage extends StatefulWidget {
     required this.vetName,
     required this.vetSpecialty,
     required this.vetRating,
+    required this.vetStatus,
   });
 
   @override
@@ -26,14 +28,17 @@ class BookAppointmentPage extends StatefulWidget {
 }
 
 class _BookAppointmentPageState extends State<BookAppointmentPage> {
-  String? selectedPet;
+  String? _selectedPetId;
+  String? _selectedPetName;
   String? selectedReason;
   int? estimatedCost;
-  String selectedType = 'In person';
   String? selectedTime;
   DateTime selectedDate = DateTime.now();
 
-  final List<String> pets = ['Spencer', 'Luna', 'Ggomo'];
+  final List<Map<String, String>> _userPets = [];
+  bool _isLoadingPets = false;
+  String? _petLoadError;
+
   final List<Map<String, dynamic>> reasons = [
     {'label': 'Regular Check-up', 'price': 800},
     {'label': 'Grooming', 'price': 500},
@@ -54,6 +59,12 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     '3:00 - 4:00 PM',
     '4:00 - 5:00 PM',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserPets();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +108,12 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   }
 
   Widget _buildSelectedVetCard() {
+    final String normalizedStatus = widget.vetStatus.trim().isEmpty
+        ? 'Available'
+        : widget.vetStatus.trim();
+    final bool isUnavailable = normalizedStatus.toLowerCase() == 'unavailable';
+    final Color statusColor = isUnavailable ? Colors.red : Colors.green;
+
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -139,6 +156,22 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
+                // Status
+                Row(
+                  children: [
+                    Icon(Icons.circle, size: 10, color: statusColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Status: $normalizedStatus',
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 // Name
                 Text(
                   widget.vetName,
@@ -158,12 +191,20 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                 // License Verified
                 Row(
                   children: const [
-                    Icon(Icons.verified, color: _mint, size: 16),
-                    SizedBox(width: 4),
                     Text(
                       'License Verified',
                       style: TextStyle(color: Colors.black54, fontSize: 13),
                     ),
+                    SizedBox(width: 4),
+                    Text(
+                      '(',
+                      style: TextStyle(color: Colors.black54, fontSize: 13),
+                    ),
+                    Icon(Icons.verified, color: _mint, size: 16),
+                    // Text(
+                    //   ')',
+                    //   style: TextStyle(color: Colors.black54, fontSize: 13),
+                    // ),
                   ],
                 ),
               ],
@@ -177,6 +218,9 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   }
 
   Widget _buildFormSection() {
+    final bool isVetUnavailable =
+        widget.vetStatus.trim().toLowerCase() == 'unavailable';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -184,18 +228,6 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
         const Text('Pets', style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         _buildPetSelector(),
-        const SizedBox(height: 20),
-
-        // Type Section
-        const Text('Type', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            _typeButton('In person'),
-            const SizedBox(width: 10),
-            _typeButton('Online Consultation'),
-          ],
-        ),
         const SizedBox(height: 20),
 
         // Select Date
@@ -256,6 +288,23 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
         _summaryCard(),
         const SizedBox(height: 20),
 
+        if (isVetUnavailable) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: const Text(
+              'This veterinarian is currently unavailable. Please choose another vet or try again later.',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
         // Action Buttons
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -273,61 +322,63 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () async {
-                // Validate all required fields
-                List<String> missingFields = [];
+              onPressed: isVetUnavailable
+                  ? null
+                  : () async {
+                      // Validate all required fields
+                      List<String> missingFields = [];
 
-                if (selectedPet == null) {
-                  missingFields.add('Pet');
-                }
-                if (selectedTime == null) {
-                  missingFields.add('Appointment Time');
-                }
-                if (selectedReason == null) {
-                  missingFields.add('Reason');
-                }
+                      if (_selectedPetId == null) {
+                        missingFields.add('Pet');
+                      }
+                      if (selectedTime == null) {
+                        missingFields.add('Appointment Time');
+                      }
+                      if (selectedReason == null) {
+                        missingFields.add('Reason');
+                      }
 
-                if (missingFields.isEmpty) {
-                  // All fields are filled, proceed with booking
-                  try {
-                    await _saveAppointmentToFirestore();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Appointment booked! Waiting for vet confirmation.',
+                      if (missingFields.isEmpty) {
+                        // All fields are filled, proceed with booking
+                        try {
+                          await _saveAppointmentToFirestore();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Appointment booked! Waiting for vet confirmation.',
+                                ),
+                                backgroundColor: _mint,
+                              ),
+                            );
+                            Navigator.pop(context);
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Error booking appointment: ${e.toString()}',
+                                ),
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        }
+                      } else {
+                        // Show error message with missing fields
+                        String message =
+                            'Please fill in the following fields: ${missingFields.join(', ')}';
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(message),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
                           ),
-                          backgroundColor: _mint,
-                        ),
-                      );
-                      Navigator.pop(context);
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Error booking appointment: ${e.toString()}',
-                          ),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  }
-                } else {
-                  // Show error message with missing fields
-                  String message =
-                      'Please fill in the following fields: ${missingFields.join(', ')}';
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(message),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                }
-              },
+                        );
+                      }
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _mint,
                 padding: const EdgeInsets.symmetric(
@@ -348,8 +399,70 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   }
 
   Widget _buildPetSelector() {
+    if (_isLoadingPets) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _mint),
+          ),
+        ),
+      );
+    }
+
+    if (_petLoadError != null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _petLoadError!,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _loadUserPets,
+              icon: const Icon(Icons.refresh, color: _mint),
+              label: const Text(
+                'Retry',
+                style: TextStyle(color: _mint, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_userPets.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Text(
+          'No pets found. Please add a pet profile before booking.',
+          style: TextStyle(color: Colors.black87, fontSize: 13),
+        ),
+      );
+    }
+
     return DropdownButtonFormField<String>(
-      value: selectedPet,
+      value: _selectedPetId,
       decoration: InputDecoration(
         filled: true,
         fillColor: Colors.white,
@@ -358,37 +471,21 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           borderSide: BorderSide.none,
         ),
       ),
-      items: pets.map((pet) {
-        return DropdownMenuItem(value: pet, child: Text(pet));
+      items: _userPets.map((pet) {
+        final petName = pet['name'] ?? 'Unnamed Pet';
+        final petId = pet['id'] ?? '';
+        return DropdownMenuItem(value: petId, child: Text(petName));
       }).toList(),
-      onChanged: (value) => setState(() => selectedPet = value),
-      hint: const Text('Select Pets'),
-    );
-  }
-
-  Widget _typeButton(String type) {
-    final bool selected = selectedType == type;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => selectedType = type),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: selected ? _mint : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: _mint),
-          ),
-          child: Center(
-            child: Text(
-              type,
-              style: TextStyle(
-                color: selected ? Colors.white : _mint,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-      ),
+      onChanged: (value) {
+        setState(() {
+          _selectedPetId = value;
+          _selectedPetName = _userPets.firstWhere(
+            (pet) => pet['id'] == value,
+            orElse: () => {'name': 'Unnamed Pet'},
+          )['name'];
+        });
+      },
+      hint: const Text('Select Pet'),
     );
   }
 
@@ -515,8 +612,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
             ),
           ),
           const SizedBox(height: 12),
-          _summaryRow('Pet:', selectedPet ?? '-'),
-          _summaryRow('Type:', selectedType),
+          _summaryRow('Pet:', _selectedPetName ?? '-'),
           _summaryRow('Reason:', selectedReason ?? '-'),
           _summaryRow(
             'Date & Time:',
@@ -593,12 +689,13 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       'userId': user.uid,
       'userEmail': user.email ?? '',
       'userName': user.displayName ?? '',
-      'petName': selectedPet!,
+      'petId': _selectedPetId,
+      'petName': _selectedPetName!,
       'vetId': widget.vetId,
       'vetName': widget.vetName,
       'vetSpecialty': widget.vetSpecialty,
       'vetRating': widget.vetRating,
-      'appointmentType': selectedType,
+      'appointmentType': 'In person',
       'date': Timestamp.fromDate(selectedDate),
       'timeSlot': selectedTime,
       'appointmentDateTime': Timestamp.fromDate(appointmentDateTime),
@@ -607,12 +704,15 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       'status':
           'pending', // pending, declined, confirmed, cancelled (only vets can change)
       'createdAt': Timestamp.now(),
+      'dismissedNotifications': <String>[],
     };
 
     // Save to user_appointments collection
-    await FirebaseFirestore.instance
+    final docRef = await FirebaseFirestore.instance
         .collection('user_appointments')
         .add(appointmentData);
+
+    await _createOrUpdateNotificationForAppointment(docRef.id, appointmentData);
   }
 
   // Helper methods to parse time string
@@ -632,5 +732,123 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   int _parseMinuteFromTime(String time) {
     final parts = time.split(' ')[0].split(':');
     return int.parse(parts[1]);
+  }
+
+  Future<void> _loadUserPets() async {
+    setState(() {
+      _isLoadingPets = true;
+      _petLoadError = null;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _isLoadingPets = false;
+          _userPets.clear();
+          _selectedPetId = null;
+          _selectedPetName = null;
+          _petLoadError = 'Please sign in to view your pets.';
+        });
+        return;
+      }
+
+      final baseQuery = FirebaseFirestore.instance
+          .collection('petInfos')
+          .where('userId', isEqualTo: user.uid);
+
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      try {
+        snapshot = await baseQuery.orderBy('name').get();
+      } on FirebaseException catch (orderError) {
+        // Missing index or other ordering issue—retry without ordering.
+        debugPrint('Order by name failed: ${orderError.message}');
+        snapshot = await baseQuery.get();
+      }
+
+      final pets = snapshot.docs.map((doc) {
+        final Map<String, dynamic> data = doc.data();
+        final rawName = (data['name'] as String?)?.trim();
+        final name = (rawName != null && rawName.isNotEmpty)
+            ? rawName
+            : 'Unnamed Pet';
+
+        return {'id': doc.id, 'name': name};
+      }).toList()..sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+
+      setState(() {
+        _userPets
+          ..clear()
+          ..addAll(pets);
+
+        if (_userPets.isEmpty) {
+          _selectedPetId = null;
+          _selectedPetName = null;
+        } else if (_selectedPetId == null ||
+            !_userPets.any((pet) => pet['id'] == _selectedPetId)) {
+          _selectedPetId = _userPets.first['id'];
+          _selectedPetName = _userPets.first['name'];
+        }
+
+        _isLoadingPets = false;
+      });
+    } catch (e, stack) {
+      debugPrint('Failed to load pets: $e');
+      debugPrint(stack.toString());
+      setState(() {
+        _isLoadingPets = false;
+        _petLoadError = 'Failed to load pets. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _createOrUpdateNotificationForAppointment(
+    String appointmentId,
+    Map<String, dynamic> appointmentData,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final notificationsRef = FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(appointmentId);
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((txn) async {
+        final existingSnap = await txn.get(notificationsRef);
+        final previousStatus = (existingSnap.data()?['status'] as String?)
+            ?.toLowerCase()
+            .trim();
+        final status =
+            (appointmentData['status'] as String?)?.toLowerCase().trim() ??
+            'pending';
+        final isStatusChanged =
+            !existingSnap.exists || previousStatus != status;
+
+        final payload = <String, dynamic>{
+          'userId': user.uid,
+          'appointmentId': appointmentId,
+          'status': status,
+          'vetName': appointmentData['vetName'],
+          'petName': appointmentData['petName'],
+          'date': appointmentData['date'],
+          'timeSlot': appointmentData['timeSlot'],
+          'appointmentDateTime': appointmentData['appointmentDateTime'],
+          'meetingLink': appointmentData['meetingLink'],
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        if (isStatusChanged) {
+          payload['createdAt'] = FieldValue.serverTimestamp();
+          payload['isRead'] = false;
+        } else {
+          payload['isRead'] = existingSnap.data()?['isRead'] as bool? ?? false;
+        }
+
+        txn.set(notificationsRef, payload, SetOptions(merge: true));
+      });
+    } catch (e) {
+      debugPrint('Failed to sync notification: $e');
+    }
   }
 }

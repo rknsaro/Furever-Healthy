@@ -24,6 +24,8 @@ class AllPetsPage extends StatefulWidget {
 class _AllPetsPageState extends State<AllPetsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _selectedPetId;
+  Map<String, dynamic>? _selectedPetData;
 
   @override
   void initState() {
@@ -35,6 +37,49 @@ class _AllPetsPageState extends State<AllPetsPage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handlePetSelection(QueryDocumentSnapshot<Object?> doc) {
+    final rawData = doc.data();
+    if (rawData is Map<String, dynamic>) {
+      final data = Map<String, dynamic>.from(rawData);
+      setState(() {
+        _selectedPetId = doc.id;
+        _selectedPetData = data;
+      });
+    }
+  }
+
+  void _ensureSelectedPet(List<QueryDocumentSnapshot<Object?>> docs) {
+    if (docs.isEmpty) {
+      if (_selectedPetId != null || _selectedPetData != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _selectedPetId = null;
+            _selectedPetData = null;
+          });
+        });
+      }
+      return;
+    }
+
+    final hasSelected =
+        _selectedPetId != null && docs.any((doc) => doc.id == _selectedPetId);
+    if (!hasSelected) {
+      final doc = docs.first;
+      final rawData = doc.data();
+      if (rawData is Map<String, dynamic>) {
+        final data = Map<String, dynamic>.from(rawData);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _selectedPetId = doc.id;
+            _selectedPetData = data;
+          });
+        });
+      }
+    }
   }
 
   @override
@@ -128,46 +173,108 @@ class _AllPetsPageState extends State<AllPetsPage>
                             )
                             .snapshots(),
                         builder: (context, snapshot) {
-                          String petName = 'Spencer';
-                          String petImage = 'assets/spencer.jpeg';
-
-                          if (snapshot.hasData &&
-                              snapshot.data!.docs.isNotEmpty) {
-                            // Try to find Spencer first, otherwise use the first pet
-                            QueryDocumentSnapshot petDoc =
-                                snapshot.data!.docs.first;
-
-                            // Look for Spencer
-                            for (var doc in snapshot.data!.docs) {
-                              final data = doc.data() as Map<String, dynamic>;
-                              final name = data['name'] as String?;
-                              if (name != null &&
-                                  name.toLowerCase() == 'spencer') {
-                                petDoc = doc;
-                                break;
-                              }
-                            }
-
-                            final data = petDoc.data() as Map<String, dynamic>;
-                            petName = data['name'] as String? ?? 'Spencer';
-                            petImage =
-                                data['imageAsset'] as String? ??
-                                'assets/spencer.jpeg';
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const SizedBox(
+                              height: 96,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
                           }
 
-                          return Row(
-                            children: [
-                              _PetCircle(name: petName, imagePath: petImage),
-                              const SizedBox(width: 12),
-                              _AddCircle(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AddNewPetPage(),
+                          if (snapshot.hasError) {
+                            return SizedBox(
+                              height: 96,
+                              child: Center(
+                                child: Text(
+                                  'Unable to load pets',
+                                  style: TextStyle(
+                                    color: Colors.red.shade400,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
-                            ],
+                            );
+                          }
+
+                          final docs =
+                              snapshot.data?.docs ??
+                              <QueryDocumentSnapshot<Object?>>[];
+                          _ensureSelectedPet(docs);
+
+                          if (docs.isEmpty) {
+                            return SizedBox(
+                              height: 96,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Expanded(
+                                    child: Text(
+                                      'No pets yet. Add your first pet to get started.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ),
+                                  _AddCircle(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const AddNewPetPage(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return SizedBox(
+                            height: 96,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.only(right: 12),
+                              itemCount: docs.length + 1,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (context, index) {
+                                if (index == docs.length) {
+                                  return _AddCircle(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const AddNewPetPage(),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final doc = docs[index];
+                                final rawData = doc.data();
+                                if (rawData is! Map<String, dynamic>) {
+                                  return const SizedBox.shrink();
+                                }
+                                final data = Map<String, dynamic>.from(rawData);
+                                final name = (data['name'] as String?)?.trim();
+                                final imageUrl = data['imageUrl'] as String?;
+                                final imageAsset =
+                                    data['imageAsset'] as String?;
+
+                                return _PetCircle(
+                                  name: name?.isNotEmpty == true
+                                      ? name!
+                                      : 'My Pet',
+                                  imageUrl: imageUrl,
+                                  assetPath: imageAsset,
+                                  isSelected: doc.id == _selectedPetId,
+                                  onTap: () => _handlePetSelection(doc),
+                                );
+                              },
+                            ),
                           );
                         },
                       ),
@@ -215,9 +322,18 @@ class _AllPetsPageState extends State<AllPetsPage>
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _ProfileTab(),
-                      const _AppointmentsTab(),
-                      const _RemindersTabWrapper(), // Use the new wrapper
+                      _ProfileTab(
+                        selectedPetId: _selectedPetId,
+                        initialPetData: _selectedPetData,
+                      ),
+                      _AppointmentsTab(
+                        selectedPetId: _selectedPetId,
+                        selectedPetName: _selectedPetData?['name'] as String?,
+                      ),
+                      _RemindersTabWrapper(
+                        selectedPetId: _selectedPetId,
+                        selectedPetName: _selectedPetData?['name'] as String?,
+                      ), // Use the new wrapper
                     ],
                   ),
                 ),
@@ -232,16 +348,26 @@ class _AllPetsPageState extends State<AllPetsPage>
 
 // ====================== PROFILE TAB ======================
 class _ProfileTab extends StatefulWidget {
-  const _ProfileTab();
+  final String? selectedPetId;
+  final Map<String, dynamic>? initialPetData;
+
+  const _ProfileTab({required this.selectedPetId, this.initialPetData});
 
   @override
   State<_ProfileTab> createState() => _ProfileTabState();
 }
 
 class _ProfileTabState extends State<_ProfileTab> {
-  String _petName = 'Spencer';
-  String _petBreed = 'Golden Retriever';
-  String _petGender = 'Male';
+  String _petName = 'My Pet';
+  String _petBreed = 'Unknown breed';
+  String _petGender = 'Unknown';
+  String? _petSpecies;
+  String? _petWeight;
+  DateTime? _petBirthDate;
+  String? _petDescription;
+  List<String> _medicalConcerns = [];
+  String? _imageUrl;
+  String? _assetPath;
 
   Widget _buildCard({
     required String title,
@@ -312,6 +438,213 @@ class _ProfileTabState extends State<_ProfileTab> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _applyPetData(Map<String, dynamic> data) {
+    final name = (data['name'] as String?)?.trim();
+    final breed = (data['breed'] as String?)?.trim();
+    final gender = (data['gender'] as String?)?.trim();
+    final species = (data['speciesType'] as String?)?.trim();
+    final weight = (data['weight'] as String?)?.trim();
+    final description = (data['description'] as String?)?.trim();
+    final concerns = data['medicalConcerns'];
+    final birthDate = data['birthDate'];
+
+    _petName = name?.isNotEmpty == true ? name! : _petName;
+    _petBreed = breed?.isNotEmpty == true ? breed! : _petBreed;
+    _petGender = gender?.isNotEmpty == true ? gender! : _petGender;
+    _petSpecies = species?.isNotEmpty == true ? species : _petSpecies;
+    _petWeight = weight?.isNotEmpty == true ? weight : null;
+    _petDescription = description?.isNotEmpty == true
+        ? description
+        : _petDescription;
+    if (concerns is List) {
+      _medicalConcerns = concerns.map((e) => e.toString()).toList();
+    } else {
+      _medicalConcerns = [];
+    }
+    if (birthDate is Timestamp) {
+      _petBirthDate = birthDate.toDate();
+    } else if (birthDate is DateTime) {
+      _petBirthDate = birthDate;
+    } else {
+      _petBirthDate = null;
+    }
+    _imageUrl = data['imageUrl'] as String?;
+    _assetPath = data['imageAsset'] as String?;
+  }
+
+  String _petInitial() {
+    final trimmed = _petName.trim();
+    if (trimmed.isEmpty) return '?';
+    return trimmed.substring(0, 1).toUpperCase();
+  }
+
+  Widget _buildInitialAvatar(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFE8F3D8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _petInitial(),
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: _mintDark,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    const double size = 56;
+
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          _imageUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildInitialAvatar(size),
+        ),
+      );
+    }
+
+    if (_assetPath != null && _assetPath!.isNotEmpty) {
+      return ClipOval(
+        child: Image.asset(
+          _assetPath!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildInitialAvatar(size),
+        ),
+      );
+    }
+
+    return _buildInitialAvatar(size);
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.black87, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedicalConcerns() {
+    if (_medicalConcerns.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _medicalConcerns
+            .map(
+              (concern) => Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: _mint.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  concern,
+                  style: const TextStyle(
+                    color: _mintDark,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  String? _formatDate(DateTime? date) {
+    if (date == null) return null;
+    return DateFormat.yMMMMd().format(date);
+  }
+
+  Widget _buildDetailsCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Overview',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildInfoRow('Breed', _petBreed),
+          _buildInfoRow('Gender', _petGender),
+          if (_petSpecies != null) _buildInfoRow('Species', _petSpecies!),
+          if (_petWeight != null && _petWeight!.isNotEmpty)
+            _buildInfoRow('Weight', _petWeight!),
+          if (_formatDate(_petBirthDate) != null)
+            _buildInfoRow('Birth Date', _formatDate(_petBirthDate)!),
+          if (_petDescription != null && _petDescription!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _petDescription!,
+                style: const TextStyle(color: Colors.black87, fontSize: 13),
+              ),
+            ),
+          _buildMedicalConcerns(),
         ],
       ),
     );
@@ -396,46 +729,45 @@ class _ProfileTabState extends State<_ProfileTab> {
       );
     }
 
-    return StreamBuilder<QuerySnapshot>(
+    final petId = widget.selectedPetId;
+    if (petId == null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Text(
+          'Add a pet to view their profile information.',
+          style: TextStyle(color: Colors.black54, fontSize: 14),
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('petInfos')
-          .where('userId', isEqualTo: user.uid)
+          .doc(petId)
           .snapshots(),
       builder: (context, snapshot) {
-        String displayName = _petName;
-        String displayBreed = _petBreed;
-        String displayGender = _petGender;
-
-        if (snapshot.hasError) {
-          print('Error loading pets: ${snapshot.error}');
+        Map<String, dynamic>? data;
+        if (snapshot.hasData && snapshot.data?.data() != null) {
+          data = Map<String, dynamic>.from(snapshot.data!.data()!);
+        } else if (widget.initialPetData != null) {
+          data = Map<String, dynamic>.from(widget.initialPetData!);
         }
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          // Try to find Spencer first, otherwise use the first pet
-          QueryDocumentSnapshot petDoc = snapshot.data!.docs.first;
-
-          // Look for Spencer
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final name = data['name'] as String?;
-            if (name != null && name.toLowerCase() == 'spencer') {
-              petDoc = doc;
-              break;
-            }
-          }
-
-          final data = petDoc.data() as Map<String, dynamic>;
-          displayName = data['name'] as String? ?? _petName;
-          displayBreed = data['breed'] as String? ?? _petBreed;
-          displayGender = data['gender'] as String? ?? _petGender;
-
-          print('Loaded pet data: $displayName, $displayBreed, $displayGender');
-        } else if (snapshot.connectionState == ConnectionState.waiting) {
-          // Keep default values while loading
-          print('Loading pet data...');
-        } else if (snapshot.connectionState == ConnectionState.done &&
-            (!snapshot.hasData || snapshot.data!.docs.isEmpty)) {
-          print('No pet data found in database');
+        if (data != null) {
+          _applyPetData(data);
         }
 
         return Container(
@@ -455,24 +787,17 @@ class _ProfileTabState extends State<_ProfileTab> {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 3,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _mint,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
+                  _buildProfileAvatar(),
+                  const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        displayName,
+                        _petName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -481,7 +806,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '$displayBreed, $displayGender',
+                        '$_petBreed, $_petGender',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.black54,
@@ -497,11 +822,11 @@ class _ProfileTabState extends State<_ProfileTab> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          EditPetProfilePage(petName: displayName),
+                          EditPetProfilePage(petId: petId, petName: _petName),
                     ),
                   );
                   if (result == true) {
-                    setState(() {}); // Trigger rebuild
+                    if (mounted) setState(() {});
                   }
                 },
                 child: const Text(
@@ -525,52 +850,54 @@ class _ProfileTabState extends State<_ProfileTab> {
         child: Column(
           children: [
             _buildProfileHeader(context),
+            if (widget.selectedPetId != null) _buildDetailsCard(),
             _buildCard(
               title: 'Recent notes',
               iconPath: 'assets/recent_notes.png',
               description:
-                  'Add a note to record important information, details or events.',
+                  'Add a note to record important information about $_petName.',
               buttonText: 'Add note',
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const RecentNotesPage()),
+                  MaterialPageRoute(
+                    builder: (_) => RecentNotesPage(initialPetName: _petName),
+                  ),
                 );
               },
             ),
             _buildCard(
               title: 'Grooming',
               iconPath: 'assets/pet_grooming.png',
-              description:
-                  'Set a schedule for your pet’s routine care and maintenance.',
+              description: 'Set a grooming routine tailored for $_petName.',
               buttonText: 'Add grooming',
               onPressed: () {},
             ),
             _buildCard(
               title: 'Feeding',
               iconPath: 'assets/pet_feeding.png',
-              description:
-                  'Set a schedule for your pet’s daily meals and portion sizes.',
+              description: 'Plan $_petName’s meals and portion sizes.',
               buttonText: 'Add feeding',
               onPressed: () {},
             ),
             _buildCard(
               title: 'Ongoing Medications',
               iconPath: 'assets/pet_medication.png',
-              description: 'Keep track of ongoing medications.',
+              description: 'Keep track of ongoing medications for $_petName.',
               buttonText: 'Add medication',
               onPressed: () {},
             ),
             _buildCard(
               title: 'Vaccines',
               iconPath: 'assets/pet_vaccines.png',
-              description: 'There are no vaccines to display.',
+              description:
+                  'Manage upcoming and completed vaccines for $_petName.',
               buttonText: 'Add vaccine',
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const VaccinePage(petName: 'Spencer'),
+                    builder: (context) => VaccinePage(petName: _petName),
                   ),
                 );
               },
@@ -584,7 +911,10 @@ class _ProfileTabState extends State<_ProfileTab> {
 
 // ====================== APPOINTMENTS TAB ======================
 class _AppointmentsTab extends StatefulWidget {
-  const _AppointmentsTab();
+  final String? selectedPetId;
+  final String? selectedPetName;
+
+  const _AppointmentsTab({this.selectedPetId, this.selectedPetName});
 
   @override
   State<_AppointmentsTab> createState() => _AppointmentsTabState();
@@ -636,6 +966,40 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
     return grouped;
   }
 
+  List<Map<String, dynamic>> _filterAppointments(
+    List<Map<String, dynamic>> appointments,
+  ) {
+    final selectedId = widget.selectedPetId?.trim();
+    final selectedName = widget.selectedPetName?.trim();
+
+    if ((selectedId == null || selectedId.isEmpty) &&
+        (selectedName == null || selectedName.isEmpty)) {
+      return appointments;
+    }
+
+    return appointments.where((appointment) {
+      final appointmentPetId = appointment['petId'];
+      final appointmentPetName = appointment['petName'];
+
+      if (selectedId != null &&
+          selectedId.isNotEmpty &&
+          appointmentPetId != null &&
+          appointmentPetId.toString().isNotEmpty) {
+        return appointmentPetId == selectedId;
+      }
+
+      if (selectedName != null &&
+          selectedName.isNotEmpty &&
+          appointmentPetName != null &&
+          appointmentPetName.toString().isNotEmpty) {
+        return appointmentPetName.toString().toLowerCase() ==
+            selectedName.toLowerCase();
+      }
+
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -678,13 +1042,16 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
 
         // Get selected day's appointments (normalize to date only for lookup)
         final selectedDayAppointments = _selectedDay != null
-            ? appointmentsMap[DateTime(
+            ? (appointmentsMap[DateTime(
                     _selectedDay!.year,
                     _selectedDay!.month,
                     _selectedDay!.day,
                   )] ??
-                  []
-            : [];
+                  <Map<String, dynamic>>[])
+            : <Map<String, dynamic>>[];
+        final filteredAppointments = _filterAppointments(
+          selectedDayAppointments,
+        );
 
         return Column(
           children: [
@@ -774,7 +1141,7 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
 
             // Selected day appointments
             Expanded(
-              child: selectedDayAppointments.isEmpty
+              child: filteredAppointments.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -786,7 +1153,9 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'No appointments on this day',
+                            (widget.selectedPetName?.trim().isNotEmpty ?? false)
+                                ? 'No appointments for ${widget.selectedPetName!.trim()} on this day'
+                                : 'No appointments on this day',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey[600],
@@ -796,9 +1165,9 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
                       ),
                     )
                   : ListView.builder(
-                      itemCount: selectedDayAppointments.length,
+                      itemCount: filteredAppointments.length,
                       itemBuilder: (context, index) {
-                        final appointment = selectedDayAppointments[index];
+                        final appointment = filteredAppointments[index];
                         final date = appointment['appointmentDateTime'] != null
                             ? (appointment['appointmentDateTime'] as Timestamp)
                                   .toDate()
@@ -952,17 +1321,29 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
 
 // ====================== REMINDERS TAB WRAPPER (to use the external file) ======================
 class _RemindersTabWrapper extends StatelessWidget {
-  const _RemindersTabWrapper();
+  final String? selectedPetId;
+  final String? selectedPetName;
+
+  const _RemindersTabWrapper({this.selectedPetId, this.selectedPetName});
 
   @override
   Widget build(BuildContext context) {
+    final hasSelection = selectedPetId != null && selectedPetId!.isNotEmpty;
+    final petName = (selectedPetName?.trim().isNotEmpty ?? false)
+        ? selectedPetName!.trim()
+        : 'your pet';
+    final message = hasSelection
+        ? 'No reminders for $petName yet. Want to set one up?'
+        : 'Select a pet to view reminders.';
+    const buttonText = 'Add reminder';
+
     // 3. REPLACING THE LOCAL _RemindersTab with a call to the new file's widget
     return RemindersTab(
       // We pass the required props to keep the logic here
       // The button pressed logic is now inside RemindersTab
       iconPath: 'assets/reminders.png',
-      message: 'No reminders for now. Want to set one up?',
-      buttonText: 'Add reminder',
+      message: message,
+      buttonText: buttonText,
     );
   }
 }
@@ -1024,43 +1405,109 @@ class EmptyStateWidget extends StatelessWidget {
 // ====================== PET CIRCLE ======================
 class _PetCircle extends StatelessWidget {
   final String name;
-  final String imagePath;
+  final String? imageUrl;
+  final String? assetPath;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  const _PetCircle({required this.name, required this.imagePath});
+  const _PetCircle({
+    required this.name,
+    this.imageUrl,
+    this.assetPath,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  String _initial() {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+    return trimmed.substring(0, 1).toUpperCase();
+  }
+
+  Widget _buildFallback(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFE8F3D8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _initial(),
+        style: const TextStyle(
+          color: _mintDark,
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage(double size) {
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          imageUrl!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallback(size),
+        ),
+      );
+    }
+    if (assetPath != null && assetPath!.isNotEmpty) {
+      return ClipOval(
+        child: Image.asset(
+          assetPath!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallback(size),
+        ),
+      );
+    }
+    return _buildFallback(size);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xBFB9E591),
+    const double imageSize = 56;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isSelected ? _mint : Colors.transparent,
+                width: 2,
+              ),
+            ),
+            child: _buildAvatarImage(imageSize),
           ),
-          child: ClipOval(
-            child: imagePath.startsWith('assets/')
-                ? Image.asset(
-                    imagePath,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset('assets/dog.png', fit: BoxFit.contain);
-                    },
-                  )
-                : Image.asset('assets/dog.png', fit: BoxFit.contain),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 70,
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? _mintDark : Colors.black87,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          name,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

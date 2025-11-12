@@ -36,6 +36,7 @@ class QuickActionsPanel extends StatelessWidget {
             shrinkWrap: true,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
+            childAspectRatio: .9,
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _QuickAction(
@@ -90,11 +91,7 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final String iconPath;
   final VoidCallback? onTap;
-  const _QuickAction({
-    required this.label,
-    required this.iconPath,
-    this.onTap,
-  });
+  const _QuickAction({required this.label, required this.iconPath, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -129,8 +126,10 @@ class _QuickAction extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: Colors.black87,
               ),
+              maxLines: 2,
+              softWrap: true,
+              overflow: TextOverflow.visible,
               textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

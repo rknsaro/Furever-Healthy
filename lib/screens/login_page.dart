@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
-import 'package:twitter_login/twitter_login.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'signup_page.dart';
@@ -50,10 +49,8 @@ class _LoginPageState extends State<LoginPage> {
       final String password = _passwordController.text.trim();
 
       try {
-        final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+        final userCredential = await FirebaseAuth.instance
+            .signInWithEmailAndPassword(email: email, password: password);
         await _saveUserToFirestore(userCredential.user!);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -61,7 +58,9 @@ class _LoginPageState extends State<LoginPage> {
             content: const Text('Login Successful!'),
             backgroundColor: const Color(0xFF6F994A),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
             margin: const EdgeInsets.all(20),
           ),
         );
@@ -96,8 +95,9 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       await _saveUserToFirestore(userCredential.user!);
 
       Navigator.of(context).pushReplacement(
@@ -118,11 +118,13 @@ class _LoginPageState extends State<LoginPage> {
       print("Facebook login message: ${result.message}");
 
       if (result.status == LoginStatus.success) {
-        final credential =
-            FacebookAuthProvider.credential(result.accessToken!.token);
+        final credential = FacebookAuthProvider.credential(
+          result.accessToken!.token,
+        );
 
-        final userCredential =
-            await FirebaseAuth.instance.signInWithCredential(credential);
+        final userCredential = await FirebaseAuth.instance.signInWithCredential(
+          credential,
+        );
         await _saveUserToFirestore(userCredential.user!);
 
         Navigator.of(context).pushReplacement(
@@ -136,50 +138,6 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       print("Facebook login error: $e");
       _showError("An error occurred during Facebook login. Please try again.");
-    }
-  }
-
-  // ✅ Twitter Login
-  Future<void> _signInWithTwitter() async {
-    try {
-      final twitterLogin = TwitterLogin(
-        apiKey: "YOUR_TWITTER_API_KEY",
-        apiSecretKey: "YOUR_TWITTER_API_SECRET",
-        redirectURI: "YOUR_TWITTER_REDIRECT_URI",
-      );
-
-      final authResult = await twitterLogin.login();
-
-      switch (authResult.status) {
-        case TwitterLoginStatus.loggedIn:
-          final credential = TwitterAuthProvider.credential(
-            accessToken: authResult.authToken!,
-            secret: authResult.authTokenSecret!,
-          );
-
-          final userCredential =
-              await FirebaseAuth.instance.signInWithCredential(credential);
-          await _saveUserToFirestore(userCredential.user!);
-
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const HomePage()),
-          );
-          break;
-
-        case TwitterLoginStatus.cancelledByUser:
-          _showError("Twitter login was cancelled.");
-          break;
-
-        case TwitterLoginStatus.error:
-          _showError("Twitter login failed: ${authResult.errorMessage}");
-          break;
-
-        default:
-          _showError("Unknown error with Twitter login.");
-      }
-    } catch (e) {
-      print("Twitter login error: $e");
-      _showError("An error occurred during Twitter login. Please try again.");
     }
   }
 
@@ -213,7 +171,11 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 10),
                   const Text(
                     'Log In',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   const Text(
                     'Hey there! Welcome back',
@@ -239,7 +201,13 @@ class _LoginPageState extends State<LoginPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Email
-                          const Text('Email', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                          const Text(
+                            'Email',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _emailController,
@@ -248,27 +216,53 @@ class _LoginPageState extends State<LoginPage> {
                               hintText: 'Enter your email',
                               filled: true,
                               fillColor: Color(0xFFF0F0F0),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 15,
+                              ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Color(0xFFE0E0E0),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFF112F15), width: 2),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Color(0xFF112F15),
+                                  width: 2,
+                                ),
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty) return 'Please enter your email';
-                              if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) return 'Enter a valid email';
+                              if (value == null || value.isEmpty)
+                                return 'Please enter your email';
+                              if (!RegExp(
+                                r'^[^@]+@[^@]+\.[^@]+',
+                              ).hasMatch(value))
+                                return 'Enter a valid email';
                               return null;
                             },
                           ),
                           const SizedBox(height: 20),
 
                           // Password
-                          const Text('Password', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                          const Text(
+                            'Password',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _passwordController,
@@ -277,19 +271,37 @@ class _LoginPageState extends State<LoginPage> {
                               hintText: 'Enter your password',
                               filled: true,
                               fillColor: const Color(0xFFF0F0F0),
-                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                              border: const OutlineInputBorder(
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 15,
+                              ),
                               enabledBorder: const OutlineInputBorder(
-                                borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFFE0E0E0)),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Color(0xFFE0E0E0),
+                                ),
                               ),
                               focusedBorder: const OutlineInputBorder(
-                                borderRadius: BorderRadius.all(Radius.circular(10)),
-                                borderSide: BorderSide(color: Color(0xFF112F15), width: 2),
+                                borderRadius: BorderRadius.all(
+                                  Radius.circular(10),
+                                ),
+                                borderSide: BorderSide(
+                                  color: Color(0xFF112F15),
+                                  width: 2,
+                                ),
                               ),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscureText ? Icons.visibility_off : Icons.visibility,
+                                  _obscureText
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
                                   color: Colors.grey,
                                 ),
                                 onPressed: () {
@@ -300,8 +312,10 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty) return 'Please enter your password';
-                              if (value.length < 8) return 'Password must be at least 8 characters';
+                              if (value == null || value.isEmpty)
+                                return 'Please enter your password';
+                              if (value.length < 8)
+                                return 'Password must be at least 8 characters';
                               return null;
                             },
                           ),
@@ -319,22 +333,34 @@ class _LoginPageState extends State<LoginPage> {
                                     child: Checkbox(
                                       value: _rememberMe,
                                       onChanged: (value) {
-                                        setState(() => _rememberMe = value ?? false);
+                                        setState(
+                                          () => _rememberMe = value ?? false,
+                                        );
                                       },
                                       activeColor: const Color(0xFF112F15),
                                       checkColor: Colors.white,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  const Text('Remember me', style: TextStyle(fontSize: 14)),
+                                  const Text(
+                                    'Remember me',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
                                 ],
                               ),
                               TextButton(
                                 onPressed: () {
                                   // TODO: Forgot password
                                 },
-                                child: const Text('Forgot Password?', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                child: const Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -346,13 +372,19 @@ class _LoginPageState extends State<LoginPage> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF112F15),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
                                 elevation: 0,
                               ),
                               onPressed: _handleLogin,
                               child: const Text(
                                 'Log In',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -361,15 +393,30 @@ class _LoginPageState extends State<LoginPage> {
                           // OR divider
                           Row(
                             children: [
-                              const Expanded(child: Divider(thickness: 1, color: Color(0xFFE0E0E0))),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                child: Text(
-                                  'Or sign up with',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              const Expanded(
+                                child: Divider(
+                                  thickness: 1,
+                                  color: Color(0xFFE0E0E0),
                                 ),
                               ),
-                              const Expanded(child: Divider(thickness: 1, color: Color(0xFFE0E0E0))),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                child: Text(
+                                  'Or sign up with',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(
+                                child: Divider(
+                                  thickness: 1,
+                                  color: Color(0xFFE0E0E0),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 20),
@@ -380,15 +427,19 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               GestureDetector(
                                 onTap: _signInWithFacebook,
-                                child: Image.asset('assets/facebook.png', width: 40, height: 40),
+                                child: Image.asset(
+                                  'assets/facebook.png',
+                                  width: 40,
+                                  height: 40,
+                                ),
                               ),
                               GestureDetector(
                                 onTap: _signInWithGoogle,
-                                child: Image.asset('assets/google.png', width: 40, height: 40),
-                              ),
-                              GestureDetector(
-                                onTap: _signInWithTwitter,
-                                child: Image.asset('assets/twitter.png', width: 40, height: 40),
+                                child: Image.asset(
+                                  'assets/google.png',
+                                  width: 40,
+                                  height: 40,
+                                ),
                               ),
                             ],
                           ),
@@ -403,16 +454,21 @@ class _LoginPageState extends State<LoginPage> {
                                 onTap: () async {
                                   await Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => const SignupPage()),
+                                    MaterialPageRoute(
+                                      builder: (context) => const SignupPage(),
+                                    ),
                                   );
                                 },
                                 child: const Text(
                                   'Sign up.',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF112F15)),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF112F15),
+                                  ),
                                 ),
                               ),
                             ],
-                          )
+                          ),
                         ],
                       ),
                     ),

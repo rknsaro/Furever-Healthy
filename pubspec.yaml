@@ -95,6 +95,13 @@ flutter:
     - assets/notif_bell.png
     - assets/user_prof.png
     - assets/spencer.jpeg
+    - assets/comment.png
+    - assets/pawheart.png
+    - assets/pawheart_filled.png
+    - assets/save_post.png
+    - assets/share_button.png
+    - assets/pet_images/
+
 
   # To add assets to your application, add an assets section, like this:
   # assets:

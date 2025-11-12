@@ -2,9 +2,10 @@
 // ignore_for_file: unused_field
 import 'dart:convert';
 import 'dart:typed_data';
-// import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 
 import 'breed_detail_screen.dart';
 import 'identify_breed_picker_io.dart'
@@ -24,12 +25,21 @@ class IdentifyBreedScreen extends StatefulWidget {
 class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
   Uint8List? _selectedImageBytes;
   String? _selectedFileName;
+  String? _selectedImageMimeType;
   bool _isIdentifying = false;
 
-  final _model = GenerativeModel(
-    model: 'gemini-2.5-flash',
-    apiKey: 'AIzaSyCsFXMHJmZwB1nwvACe9sy2WV8HDxZLsAg', // Replace this
-  );
+  GenerativeModel? _model;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      _model = GenerativeModel(
+        model: 'gemini-2.5-flash',
+        apiKey: 'AIzaSyB9nY0XE9phU6nIJZ5OS_s5C6qenabz6bU', // Replace this
+      );
+    }
+  }
 
   Future<void> _pickImage() async {
     try {
@@ -50,6 +60,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
         setState(() {
           _selectedImageBytes = picked.bytes;
           _selectedFileName = picked.name;
+          _selectedImageMimeType = _inferMimeType(picked.name);
         });
       }
     } catch (e) {
@@ -61,6 +72,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     setState(() {
       _selectedImageBytes = null;
       _selectedFileName = null;
+      _selectedImageMimeType = null;
     });
     _pickImage();
   }
@@ -141,16 +153,13 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
       Only output valid JSON.
       """;
 
-      final response = await _model.generateContent([
-        Content.multi([
-          TextPart(prompt),
-          DataPart('image/jpeg', _selectedImageBytes!),
-        ]),
-      ]);
+      final responseText = kIsWeb
+          ? await _generateResponseWeb(prompt)
+          : await _generateResponseNonWeb(prompt);
 
       Navigator.of(context).pop(); // Close spinner
 
-      final text = response.text?.trim() ?? '';
+      final text = responseText.trim();
       if (text.isEmpty) {
         _showAlert('Error', 'No response received from the AI.');
         return;
@@ -181,7 +190,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
 
       // Navigate to detailed breed screen
       if (context.mounted) {
-        Navigator.push(
+        final result = await Navigator.push<String>(
           context,
           MaterialPageRoute(
             builder: (context) => BreedDetailScreen(
@@ -200,6 +209,10 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
             ),
           ),
         );
+        // Return the breed to the previous screen if user confirmed it
+        if (result != null && context.mounted) {
+          Navigator.of(context).pop(result);
+        }
       }
     } catch (e) {
       Navigator.of(context).pop();
@@ -207,6 +220,79 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     } finally {
       setState(() => _isIdentifying = false);
     }
+  }
+
+  String _inferMimeType(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    return 'image/jpeg';
+  }
+
+  Future<String> _generateResponseNonWeb(String prompt) async {
+    final model = _model;
+    if (model == null) {
+      throw StateError('Gemini model not initialized for this platform.');
+    }
+    final response = await model.generateContent([
+      Content.multi([
+        TextPart(prompt),
+        DataPart(_selectedImageMimeType ?? 'image/jpeg', _selectedImageBytes!),
+      ]),
+    ]);
+    return response.text ?? '';
+  }
+
+  Future<String> _generateResponseWeb(String prompt) async {
+    const proxyBase = 'https://cors.isomorphic-git.org/';
+    final targetUrl =
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyB9nY0XE9phU6nIJZ5OS_s5C6qenabz6bU';
+    final uri = Uri.parse('$proxyBase$targetUrl');
+
+    final payload = {
+      'contents': [
+        {
+          'parts': [
+            {'text': prompt},
+            {
+              'inlineData': {
+                'mimeType': _selectedImageMimeType ?? 'image/jpeg',
+                'data': base64Encode(_selectedImageBytes!),
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(
+        'Gemini request failed with status ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final candidates = decoded['candidates'] as List<dynamic>?;
+    if (candidates == null || candidates.isEmpty) {
+      return '';
+    }
+
+    final parts =
+        (candidates.first['content']?['parts'] as List<dynamic>?) ?? const [];
+    final buffer = StringBuffer();
+    for (final part in parts) {
+      final text = part['text'] as String?;
+      if (text != null) {
+        buffer.write(text);
+      }
+    }
+    return buffer.toString();
   }
 
   void _showAlert(String title, String message) {

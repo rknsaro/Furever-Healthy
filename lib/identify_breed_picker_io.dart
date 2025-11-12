@@ -1,5 +1,5 @@
 // lib/identify_breed_picker_io.dart
-// This file is used for non-web platforms (android/ios/desktop).
+// This file is used for non-web platforms (Android builds).
 // It uses package:file_picker to get file bytes.
 
 import 'dart:typed_data';

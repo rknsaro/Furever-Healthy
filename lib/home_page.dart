@@ -7,6 +7,7 @@ import 'package:fureverhealthy/my_pets/add_new_pet.dart';
 import 'package:fureverhealthy/my_pets/all_pets.dart';
 import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
 import 'package:fureverhealthy/identify_breed.dart';
+import 'package:fureverhealthy/notifications.dart';
 import 'user_prof_tab.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -65,14 +66,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Image.asset('assets/notif_bell.png', height: 26),
-            onPressed: () {},
-            tooltip: 'Notifications',
-          ),
-          const SizedBox(width: 6),
-        ],
+        actions: const [_NotificationsBellButton(), SizedBox(width: 6)],
       );
     }
     return null;
@@ -125,10 +119,8 @@ class _PageWithHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header matches the screenshot
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: const BoxDecoration(
             color: _mint,
             boxShadow: [
@@ -139,29 +131,125 @@ class _PageWithHeader extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Image.asset('assets/furever.png', height: 36),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Furever Healthy',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      Image.asset('assets/furever.png', height: 36),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Furever Healthy',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: .2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const _NotificationsBellButton(
+                    padding: EdgeInsets.zero,
+                    compactConstraints: true,
                   ),
                 ],
               ),
-              Image.asset('assets/notif_bell.png', height: 26),
-            ],
+            ),
           ),
         ),
         Expanded(child: child),
       ],
+    );
+  }
+}
+
+class _NotificationsBellButton extends StatelessWidget {
+  final EdgeInsetsGeometry padding;
+  final bool compactConstraints;
+
+  const _NotificationsBellButton({
+    this.padding = const EdgeInsets.all(8),
+    this.compactConstraints = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final resolvedPadding = padding.resolve(Directionality.of(context));
+
+    Widget buildBell(int unreadCount) {
+      final icon = Image.asset('assets/notif_bell.png', height: 26);
+      final button = IconButton(
+        padding: resolvedPadding,
+        constraints: compactConstraints
+            ? const BoxConstraints(minWidth: 30, minHeight: 30)
+            : const BoxConstraints(minWidth: 40, minHeight: 40),
+        icon: icon,
+        tooltip: 'Notifications',
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NotificationsPage()),
+          );
+        },
+      );
+
+      if (unreadCount <= 0) {
+        return button;
+      }
+
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          button,
+          Positioned(
+            right: resolvedPadding.horizontal == 0 ? 0 : 4,
+            top: resolvedPadding.vertical == 0 ? -2 : 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: Text(
+                unreadCount > 9 ? '9+' : unreadCount.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (user == null) {
+      return buildBell(0);
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('notifications')
+          .where('userId', isEqualTo: user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        int unreadCount = 0;
+        if (snapshot.hasData) {
+          unreadCount = snapshot.data!.docs.where((doc) {
+            final data = doc.data();
+            return (data['isRead'] as bool? ?? false) == false;
+          }).length;
+        }
+        return buildBell(unreadCount);
+      },
     );
   }
 }
@@ -277,32 +365,176 @@ class HomeTab extends StatelessWidget {
 
             SizedBox(
               height: 100,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  const _PetCircle(),
-                  const SizedBox(width: 10),
-                  const _AddCircle(),
-                ],
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseAuth.instance.currentUser != null
+                    ? FirebaseFirestore.instance
+                          .collection('petInfos')
+                          .where(
+                            'userId',
+                            isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                          )
+                          .snapshots()
+                    : null,
+                builder: (context, snapshot) {
+                  if (FirebaseAuth.instance.currentUser == null) {
+                    return ListView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        const _PetCircle(petName: 'Spencer', petType: 'Dog'),
+                        const SizedBox(width: 10),
+                        const _AddCircle(),
+                      ],
+                    );
+                  }
+
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final pets = snapshot.data!.docs;
+                  if (pets.isEmpty) {
+                    return ListView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      children: [
+                        const _PetCircle(petName: 'Spencer', petType: 'Dog'),
+                        const SizedBox(width: 10),
+                        const _AddCircle(),
+                      ],
+                    );
+                  }
+
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: pets.length + 1, // +1 for AddCircle
+                    itemBuilder: (context, index) {
+                      if (index == pets.length) {
+                        return const _AddCircle();
+                      }
+                      final petData =
+                          pets[index].data() as Map<String, dynamic>;
+                      final petName = petData['name'] as String? ?? 'Unknown';
+                      final petType =
+                          petData['speciesType'] as String? ?? 'Dog';
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          right: index == pets.length - 1 ? 0 : 10,
+                        ),
+                        child: _PetCircle(petName: petName, petType: petType),
+                      );
+                    },
+                  );
+                },
               ),
             ),
 
-            SizedBox(
-              height: petCardHeight + 30,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: petCardWidth,
-                      child: const _PetDetailCard(height: petCardHeight),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseAuth.instance.currentUser != null
+                  ? FirebaseFirestore.instance
+                        .collection('petInfos')
+                        .where(
+                          'userId',
+                          isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                        )
+                        .snapshots()
+                  : null,
+              builder: (context, snapshot) {
+                if (FirebaseAuth.instance.currentUser == null) {
+                  return SizedBox(
+                    height: petCardHeight + 30,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: petCardWidth,
+                            child: const _PetDetailCard(height: petCardHeight),
+                          ),
+                          const SizedBox(width: 14),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 14),
-                  ],
-                ),
-              ),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return SizedBox(
+                    height: petCardHeight + 30,
+                    child: const Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final pets = snapshot.data!.docs;
+                if (pets.isEmpty) {
+                  return SizedBox(
+                    height: petCardHeight + 30,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: petCardWidth,
+                            child: const _PetDetailCard(height: petCardHeight),
+                          ),
+                          const SizedBox(width: 14),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                // Show horizontal scroll only if 2 or more pets
+                final shouldScroll = pets.length >= 2;
+
+                return SizedBox(
+                  height: petCardHeight + 30,
+                  child: shouldScroll
+                      ? SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              ...pets.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final petDoc = entry.value;
+                                final petData =
+                                    petDoc.data() as Map<String, dynamic>;
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    right: index == pets.length - 1 ? 0 : 14,
+                                  ),
+                                  child: SizedBox(
+                                    width: petCardWidth,
+                                    child: _PetDetailCard(
+                                      height: petCardHeight,
+                                      petId: petDoc.id,
+                                      petData: petData,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        )
+                      : Row(
+                          children: [
+                            SizedBox(
+                              width: petCardWidth,
+                              child: _PetDetailCard(
+                                height: petCardHeight,
+                                petId: pets.first.id,
+                                petData:
+                                    pets.first.data() as Map<String, dynamic>,
+                              ),
+                            ),
+                          ],
+                        ),
+                );
+              },
             ),
 
             const SizedBox(height: 18),
@@ -370,70 +602,30 @@ class _OutlinedPillButton extends StatelessWidget {
 }
 
 class _PetCircle extends StatelessWidget {
-  const _PetCircle();
+  final String petName;
+  final String petType;
+
+  const _PetCircle({this.petName = 'Spencer', this.petType = 'Dog'});
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final iconAsset = petType.toLowerCase() == 'cat'
+        ? 'assets/cat.png'
+        : 'assets/dog.png';
 
-    if (user == null) {
-      return Column(
-        children: [
-          SizedBox(
-            width: 70,
-            height: 70,
-            child: Center(child: Image.asset('assets/dog.png', height: 40)),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Spencer',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ],
-      );
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('petInfos')
-          .where('userId', isEqualTo: user.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        String petName = 'Spencer';
-
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          // Try to find Spencer first, otherwise use the first pet
-          QueryDocumentSnapshot petDoc = snapshot.data!.docs.first;
-
-          // Look for Spencer
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final name = data['name'] as String?;
-            if (name != null && name.toLowerCase() == 'spencer') {
-              petDoc = doc;
-              break;
-            }
-          }
-
-          final data = petDoc.data() as Map<String, dynamic>;
-          petName = data['name'] as String? ?? 'Spencer';
-        }
-
-        return Column(
-          children: [
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: Center(child: Image.asset('assets/dog.png', height: 40)),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              petName,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ],
-        );
-      },
+    return Column(
+      children: [
+        SizedBox(
+          width: 70,
+          height: 70,
+          child: Center(child: Image.asset(iconAsset, height: 40)),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          petName,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 }
@@ -472,259 +664,147 @@ class _AddCircle extends StatelessWidget {
 
 class _PetDetailCard extends StatelessWidget {
   final double height;
+  final String? petId;
+  final Map<String, dynamic>? petData;
 
-  const _PetDetailCard({this.height = 140});
+  const _PetDetailCard({this.height = 140, this.petId, this.petData});
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    String petName = 'Spencer';
+    String petBreed = 'Golden Retriever';
+    String status = 'No concerns';
+    String petType = 'Dog';
 
-    if (user == null) {
-      return Container(
-        height: height,
-        padding: const EdgeInsets.all(10),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFBDAFE0), width: 1.4),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: double.infinity,
-              decoration: BoxDecoration(
-                color: _mint,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
-                ),
-              ),
-              child: Center(child: Image.asset('assets/dog.png', height: 40)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Spencer',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Golden Retriever',
-                    style: TextStyle(color: Colors.black54, fontSize: 13),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDE6FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFD3C8FF)),
-                    ),
-                    child: const Text(
-                      'No concerns',
-                      style: TextStyle(
-                        color: Color(0xFF5C4DB3),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
+    if (petData != null) {
+      petName = petData!['name'] as String? ?? 'Spencer';
+      petBreed = petData!['breed'] as String? ?? 'Golden Retriever';
+      petType = petData!['speciesType'] as String? ?? 'Dog';
+
+      // Get medical concerns for status
+      final medicalConcerns = petData!['medicalConcerns'] as List<dynamic>?;
+      if (medicalConcerns != null && medicalConcerns.isNotEmpty) {
+        status = medicalConcerns.map((e) => e.toString()).join(', ');
+        if (status.length > 30) {
+          status = '${status.substring(0, 27)}...';
+        }
+      } else {
+        status = 'No concerns';
+      }
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('petInfos')
-          .where('userId', isEqualTo: user.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        String petName = 'Spencer';
-        String petBreed = 'Golden Retriever';
-        String status = 'No concerns';
-        String? petId;
+    final iconAsset = petType.toLowerCase() == 'cat'
+        ? 'assets/cat.png'
+        : 'assets/dog.png';
 
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          // Try to find Spencer first, otherwise use the first pet
-          QueryDocumentSnapshot petDoc = snapshot.data!.docs.first;
-
-          // Look for Spencer
-          for (var doc in snapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final name = data['name'] as String?;
-            if (name != null && name.toLowerCase() == 'spencer') {
-              petDoc = doc;
-              break;
-            }
-          }
-
-          final data = petDoc.data() as Map<String, dynamic>;
-          petName = data['name'] as String? ?? 'Spencer';
-          petBreed = data['breed'] as String? ?? 'Golden Retriever';
-          petId = petDoc.id;
-
-          // Get medical concerns for status
-          final medicalConcerns = data['medicalConcerns'] as List<dynamic>?;
-          if (medicalConcerns != null && medicalConcerns.isNotEmpty) {
-            // Show first concern or join them if multiple
-            status = medicalConcerns.map((e) => e.toString()).join(', ');
-            if (status.length > 30) {
-              status = '${status.substring(0, 27)}...';
-            }
-          } else {
-            status = 'No concerns';
-          }
-        }
-
-        return Container(
-          height: height,
-          padding: const EdgeInsets.all(10),
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFBDAFE0), width: 1.4),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    return Container(
+      height: height,
+      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBDAFE0), width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: double.infinity,
-                decoration: BoxDecoration(
-                  color: _mint,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: _mint,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
-                  ),
-                ),
-                child: Center(child: Image.asset('assets/dog.png', height: 40)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            child: Center(child: Image.asset(iconAsset, height: 40)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            petName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditPetProfilePage(
-                                  petId: petId,
-                                  petName: petName,
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            'Edit',
-                            style: TextStyle(
-                              color: _mint,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      petBreed,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE6FF),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFD3C8FF)),
-                      ),
+                    Expanded(
                       child: Text(
-                        status,
+                        petName,
                         style: const TextStyle(
-                          color: Color(0xFF5C4DB3),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
+                    if (petId != null)
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditPetProfilePage(
+                                petId: petId,
+                                petName: petName,
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            color: _mint,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  petBreed,
+                  style: const TextStyle(color: Colors.black54, fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDE6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFD3C8FF)),
+                  ),
+                  child: Text(
+                    status,
+                    style: const TextStyle(
+                      color: Color(0xFF5C4DB3),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

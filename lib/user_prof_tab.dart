@@ -19,6 +19,7 @@ class _UserProfTabState extends State<UserProfTab> {
   String _selectedTile = ''; // Track which tile is selected
   String? _userName;
   String? _username;
+  String? _phoneNumber;
   String? _profileImageUrl;
 
   Widget _buildProfileTile({
@@ -149,9 +150,19 @@ class _UserProfTabState extends State<UserProfTab> {
 
         if (userDoc.exists) {
           final data = userDoc.data()!;
+          String? phone = _sanitizeProfileField(data['phoneNumber'] as String?);
+          if (phone != null && phone.isNotEmpty && !phone.startsWith('+63')) {
+            if (RegExp(r'^\d+$').hasMatch(phone)) {
+              phone = '+63$phone';
+            } else if (phone.startsWith('63') && phone.length >= 10) {
+              phone = '+$phone';
+            }
+          }
+
           setState(() {
-            _userName = data['name'] as String?;
-            _username = data['username'] as String?;
+            _userName = _sanitizeProfileField(data['name'] as String?);
+            _username = _sanitizeProfileField(data['username'] as String?);
+            _phoneNumber = phone;
             _profileImageUrl = data['profileImageUrl'] as String?;
           });
         }
@@ -159,6 +170,18 @@ class _UserProfTabState extends State<UserProfTab> {
         print('Error loading user data: $e');
       }
     }
+  }
+
+  String? _sanitizeProfileField(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty ||
+        trimmed.toLowerCase() == 'n/a' ||
+        trimmed.toLowerCase() == 'none' ||
+        trimmed.toLowerCase() == 'not set') {
+      return null;
+    }
+    return trimmed;
   }
 
   @override
@@ -202,9 +225,39 @@ class _UserProfTabState extends State<UserProfTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _username != null ? '@$_username' : '',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    _username != null && _username!.isNotEmpty
+                        ? '@$_username'
+                        : 'Add your username',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: _username != null && _username!.isNotEmpty
+                          ? Colors.grey[600]
+                          : Colors.grey[500],
+                      fontStyle: _username != null && _username!.isNotEmpty
+                          ? FontStyle.normal
+                          : FontStyle.italic,
+                    ),
                   ),
+                  if (_phoneNumber != null && _phoneNumber!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        _phoneNumber!,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Add your phone number',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[500],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 18),
                 ],
               ),
