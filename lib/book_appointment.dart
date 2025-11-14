@@ -39,13 +39,8 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   bool _isLoadingPets = false;
   String? _petLoadError;
 
-  final List<Map<String, dynamic>> reasons = [
-    {'label': 'Regular Check-up', 'price': 800},
-    {'label': 'Grooming', 'price': 500},
-    {'label': 'Vaccination', 'price': 300},
-    {'label': 'Emergency', 'price': 1500},
-    {'label': 'Consultation', 'price': 500},
-  ];
+  List<Map<String, dynamic>> reasons = [];
+  bool _isLoadingReasons = false;
 
   List<String> morningTimes = [
     '8:00 - 9:00 AM',
@@ -64,6 +59,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   void initState() {
     super.initState();
     _loadUserPets();
+    _loadReasonsFromDatabase();
   }
 
   @override
@@ -254,34 +250,7 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          hint: const Text('Select reason'),
-          items: reasons.map((r) {
-            return DropdownMenuItem<String>(
-              value: r['label'],
-              child: Text('${r['label']} - PHP ${r['price']}'),
-            );
-          }).toList(),
-          onChanged: (value) {
-            final selected = reasons.firstWhere(
-              (r) => r['label'] == value,
-              orElse: () => {'price': 0},
-            );
-            setState(() {
-              selectedReason = value;
-              estimatedCost = selected['price'];
-            });
-          },
-          value: selectedReason,
-        ),
+        _buildReasonDropdown(),
         const SizedBox(height: 20),
 
         // Appointment Summary
@@ -732,6 +701,162 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
   int _parseMinuteFromTime(String time) {
     final parts = time.split(' ')[0].split(':');
     return int.parse(parts[1]);
+  }
+
+  Future<void> _loadReasonsFromDatabase() async {
+    setState(() {
+      _isLoadingReasons = true;
+    });
+
+    try {
+      // Fetch app_settings document
+      final settingsDoc = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .doc('appointment_reasons')
+          .get();
+
+      if (settingsDoc.exists) {
+        final data = settingsDoc.data() as Map<String, dynamic>;
+
+        // Get reasons based on vet rating
+        // The structure might be like: { "rating_5": [...], "rating_4": [...], etc. }
+        // Or it might be a single list with rating-based filtering
+        List<Map<String, dynamic>> allReasons = [];
+
+        // Try to get reasons for specific rating first
+        final ratingKey = 'rating_${widget.vetRating}';
+        if (data.containsKey(ratingKey)) {
+          final ratingReasons = data[ratingKey] as List<dynamic>?;
+          if (ratingReasons != null) {
+            allReasons = ratingReasons.map((r) {
+              if (r is Map) {
+                return Map<String, dynamic>.from(r);
+              }
+              return {'label': r.toString(), 'price': 0};
+            }).toList();
+          }
+        }
+
+        // If no rating-specific reasons, try default or all reasons
+        if (allReasons.isEmpty) {
+          if (data.containsKey('default')) {
+            final defaultReasons = data['default'] as List<dynamic>?;
+            if (defaultReasons != null) {
+              allReasons = defaultReasons.map((r) {
+                if (r is Map) {
+                  return Map<String, dynamic>.from(r);
+                }
+                return {'label': r.toString(), 'price': 0};
+              }).toList();
+            }
+          } else if (data.containsKey('reasons')) {
+            final reasonsList = data['reasons'] as List<dynamic>?;
+            if (reasonsList != null) {
+              allReasons = reasonsList.map((r) {
+                if (r is Map) {
+                  return Map<String, dynamic>.from(r);
+                }
+                return {'label': r.toString(), 'price': 0};
+              }).toList();
+            }
+          }
+        }
+
+        setState(() {
+          reasons = allReasons;
+          _isLoadingReasons = false;
+        });
+      } else {
+        // Fallback to default reasons if settings don't exist
+        setState(() {
+          reasons = [
+            {'label': 'Regular Check-up', 'price': 800},
+            {'label': 'Grooming', 'price': 500},
+            {'label': 'Vaccination', 'price': 300},
+            {'label': 'Emergency', 'price': 1500},
+            {'label': 'Consultation', 'price': 500},
+          ];
+          _isLoadingReasons = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading reasons from database: $e');
+      // Fallback to default reasons on error
+      setState(() {
+        reasons = [
+          {'label': 'Regular Check-up', 'price': 800},
+          {'label': 'Grooming', 'price': 500},
+          {'label': 'Vaccination', 'price': 300},
+          {'label': 'Emergency', 'price': 1500},
+          {'label': 'Consultation', 'price': 500},
+        ];
+        _isLoadingReasons = false;
+      });
+    }
+  }
+
+  Widget _buildReasonDropdown() {
+    if (_isLoadingReasons) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _mint),
+          ),
+        ),
+      );
+    }
+
+    if (reasons.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text(
+          'No reasons available. Please try again later.',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+      );
+    }
+
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      hint: const Text('Select reason'),
+      items: reasons.map((r) {
+        final label = r['label'] as String? ?? 'Unknown';
+        final price = (r['price'] as num?)?.toInt() ?? 0;
+        return DropdownMenuItem<String>(
+          value: label,
+          child: Text('$label - PHP $price'),
+        );
+      }).toList(),
+      onChanged: (value) {
+        final selected = reasons.firstWhere(
+          (r) => r['label'] == value,
+          orElse: () => {'price': 0},
+        );
+        setState(() {
+          selectedReason = value;
+          estimatedCost = (selected['price'] as num?)?.toInt();
+        });
+      },
+      value: selectedReason,
+    );
   }
 
   Future<void> _loadUserPets() async {

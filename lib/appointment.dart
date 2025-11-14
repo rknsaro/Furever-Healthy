@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fureverhealthy/book_appointment.dart';
+import 'package:fureverhealthy/vet_profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -969,6 +970,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
         : status.trim();
     final bool isUnavailable = normalizedStatus.toLowerCase() == 'unavailable';
     final Color statusColor = isUnavailable ? Colors.red : Colors.green;
+    final int ratingClamped = rating.clamp(0, 5);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
@@ -986,184 +988,219 @@ class _AppointmentPageState extends State<AppointmentPage> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 6,
-                decoration: BoxDecoration(
-                  color: _mint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: _mintDark,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                specialty,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.location_on,
-                                    color: _mint,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      location,
-                                      style: const TextStyle(
-                                        color: Colors.black54,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: const [
-                                  Text(
-                                    'License Verified',
-                                    style: TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '(',
-                                    style: TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Icon(Icons.verified, color: _mint, size: 16),
-                                  Text(
-                                    ')',
-                                    style: TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: statusColor.withOpacity(0.4),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.circle, color: statusColor, size: 10),
-                              const SizedBox(width: 6),
-                              Text(
-                                normalizedStatus,
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: List.generate(
-                        rating,
-                        (index) => const Padding(
-                          padding: EdgeInsets.only(right: 2),
-                          child: Icon(
-                            Icons.star,
-                            color: Colors.green,
-                            size: 18,
-                          ),
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/vet_doctor.png',
+                      // fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          alignment: Alignment.center,
+                          // child: Icon(
+                          //   Icons.person,
+                          //   color: _mintDark.withOpacity(0.6),
+                          //   size: 24,
+                          // ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < ratingClamped ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 16,
+                    );
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: _mintDark,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              specialty,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  color: _mint,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    location,
+                                    style: const TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: const [
+                                Text(
+                                  'License Verified',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  '(',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Icon(Icons.verified, color: _mint, size: 16),
+                                Text(
+                                  ')',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: statusColor.withOpacity(0.4),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.circle, color: statusColor, size: 10),
+                            const SizedBox(width: 6),
+                            Text(
+                              normalizedStatus,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 46,
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _mint,
                               side: const BorderSide(color: _mint),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(26),
                               ),
                             ),
                             onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Profile for $name coming soon.',
-                                    style: const TextStyle(color: Colors.white),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => VetProfilePage(
+                                    vetId: vetId,
+                                    vetName: name,
+                                    vetSpecialty: specialty,
+                                    vetRating: rating,
+                                    vetLocation: location,
                                   ),
-                                  backgroundColor: _mintDark,
-                                  duration: const Duration(milliseconds: 1800),
                                 ),
                               );
                             },
-                            child: const Text(
-                              'View Profile',
-                              style: TextStyle(fontWeight: FontWeight.w600),
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'View Profile',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 46,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isUnavailable
                                   ? Colors.grey.shade400
                                   : _mint,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 20,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(26),
                               ),
+                              minimumSize: const Size.fromHeight(46),
                             ),
                             onPressed: isUnavailable
                                 ? null
@@ -1182,31 +1219,35 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                       ),
                                     );
                                   },
-                            child: const Text(
-                              'Book Appointment',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                            child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Book Now',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    if (isUnavailable)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Text(
-                          'Currently unavailable',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                    ],
+                  ),
+                  if (isUnavailable)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Currently unavailable',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

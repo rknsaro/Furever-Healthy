@@ -3,7 +3,7 @@ description: "A new Flutter project."
 publish_to: 'none'
 
 
-version: 1.0.0+1
+version: 1.0.0+3
 
 environment:
   sdk: ^3.8.1
@@ -101,6 +101,7 @@ flutter:
     - assets/save_post.png
     - assets/share_button.png
     - assets/pet_images/
+    - assets/vet_doctor.png
 
 
   # To add assets to your application, add an assets section, like this:

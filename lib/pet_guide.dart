@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'data/pet_guide_data.dart';
+import 'models/pet_breed.dart';
+import 'services/pet_guide_storage.dart';
+
 class PetGuidePage extends StatefulWidget {
   const PetGuidePage({super.key});
 
@@ -8,273 +12,468 @@ class PetGuidePage extends StatefulWidget {
 }
 
 class _PetGuidePageState extends State<PetGuidePage> {
-  String _activeCareGuideTab = 'Nutrition';
+  late List<PetBreed> _dogBreeds;
+  late List<PetBreed> _catBreeds;
+  bool _isLoadingOverrides = false;
+  late final VoidCallback _storageListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _dogBreeds = List<PetBreed>.from(defaultTopDogBreeds);
+    _catBreeds = List<PetBreed>.from(defaultTopCatBreeds);
+    _storageListener = () => _loadOverrides();
+    PetGuideStorage.instance.overridesVersion.addListener(_storageListener);
+    _loadOverrides();
+  }
+
+  @override
+  void dispose() {
+    PetGuideStorage.instance.overridesVersion.removeListener(_storageListener);
+    super.dispose();
+  }
+
+  Future<void> _loadOverrides() async {
+    if (_isLoadingOverrides) return;
+    _isLoadingOverrides = true;
+    try {
+      final overrides = await PetGuideStorage.instance.loadOverrides();
+      if (!mounted) return;
+      setState(() {
+        _dogBreeds = _applyOverrides(
+          List<PetBreed>.from(defaultTopDogBreeds),
+          overrides.dogs,
+        );
+        _catBreeds = _applyOverrides(
+          List<PetBreed>.from(defaultTopCatBreeds),
+          overrides.cats,
+        );
+      });
+    } finally {
+      _isLoadingOverrides = false;
+    }
+  }
+
+  List<PetBreed> _applyOverrides(
+    List<PetBreed> defaults,
+    Map<String, PetBreed> overrides,
+  ) {
+    if (overrides.isEmpty) {
+      return defaults;
+    }
+    return defaults
+        .map((breed) => overrides[breed.name.toLowerCase()] ?? breed)
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Breed Image and Name Section
-          Stack(
-            children: [
-              Container(
-                height: 200,
-                decoration: const BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/golden_retriever.jpeg'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.7),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 0.5],
-                    ),
-                  ),
-                  child: const Text(
-                    'Golden Retriever',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // LEFT-ALIGNED BREED INFO
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                _BreedInfoColumn(title: 'Breed Group', value: 'Sporting'),
-                SizedBox(width: 24),
-                _BreedInfoColumn(title: 'Size', value: 'Medium-large'),
-                SizedBox(width: 24),
-                _BreedInfoColumn(title: 'Life Span', value: '10-12 years'),
-              ],
+    return Container(
+      color: const Color(0xFFF6F8FB),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildBreedSection(
+              title: 'Top Dog Breeds',
+              subtitle:
+                  'Discover local favorites and family-friendly companions.',
+              breeds: _dogBreeds,
             ),
-          ),
-
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'Friendly, intelligent, and devoted. Golden Retrievers are excellent family dogs and are eager to please their owners.',
-              style: TextStyle(fontSize: 15, color: Colors.black87),
+            const SizedBox(height: 24),
+            _buildBreedSection(
+              title: 'Top Cat Breeds',
+              subtitle: 'Elegant, cuddly, and full of personality.',
+              breeds: _catBreeds,
             ),
-          ),
-          const SizedBox(height: 20),
-
-          // Characteristics
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Characteristics',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                _buildCharacteristicRow('Friendliness', 95),
-                _buildCharacteristicRow('Trainability', 90),
-                _buildCharacteristicRow('Energy Level', 80),
-                _buildCharacteristicRow('Shedding', 70),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Care Guide Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Care Guide',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildCareGuideTab('Nutrition'),
-                    _buildCareGuideTab('Grooming'),
-                    _buildCareGuideTab('Exercise'),
-                    _buildCareGuideTab('Health'),
-                  ],
-                ),
-                const SizedBox(height: 15),
-                _buildCareGuideContent(),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCharacteristicRow(String characteristic, int percentage) {
+  Widget _buildBreedSection({
+    required String title,
+    required String subtitle,
+    required List<PetBreed> breeds,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF304222),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+        const SizedBox(height: 16),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final breed in breeds) ...[
+                _BreedHighlightCard(
+                  breed: breed,
+                  onViewDetails: _openBreedDetails,
+                ),
+                if (breed != breeds.last) const SizedBox(width: 16),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openBreedDetails(PetBreed breed) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => PetBreedDetailPage(breed: breed)));
+  }
+}
+
+class _BreedHighlightCard extends StatelessWidget {
+  final PetBreed breed;
+  final void Function(PetBreed breed) onViewDetails;
+
+  const _BreedHighlightCard({required this.breed, required this.onViewDetails});
+
+  @override
+  Widget build(BuildContext context) {
+    final num clampedWidth = (MediaQuery.of(context).size.width * 0.7).clamp(
+      220.0,
+      280.0,
+    );
+    final double width = clampedWidth.toDouble();
+    return SizedBox(
+      width: width,
+      child: Card(
+        elevation: 0,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE1F1CF),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.pets, color: Color(0xFF5E7A38)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          breed.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF223118),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${breed.animalType} • ${breed.breedGroup}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6F994A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => onViewDetails(breed),
+                  child: const Text('View Details'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PetBreedDetailPage extends StatefulWidget {
+  final PetBreed breed;
+
+  const PetBreedDetailPage({super.key, required this.breed});
+
+  @override
+  State<PetBreedDetailPage> createState() => _PetBreedDetailPageState();
+}
+
+class _PetBreedDetailPageState extends State<PetBreedDetailPage> {
+  late String _activeCareGuideTab;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeCareGuideTab = 'nutrition';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final breed = widget.breed;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FB),
+      appBar: AppBar(
+        title: Text(breed.name),
+        backgroundColor: const Color(0xFF6F994A),
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE1F1CF),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(
+                          Icons.pets,
+                          size: 30,
+                          color: Color(0xFF5E7A38),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              breed.name,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF213318),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${breed.animalType} • ${breed.breedGroup}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: -4,
+                              children: [
+                                _infoPill(Icons.balance, breed.size),
+                                _infoPill(Icons.favorite, breed.lifeSpan),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    breed.description,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Colors.black87,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Characteristics',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF293821),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...breed.characteristics.entries.map(
+              (entry) =>
+                  _CharacteristicRow(label: entry.key, value: entry.value),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'Care Guide',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF293821),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: widget.breed.careGuide.keys.map((key) {
+                final isActive = _activeCareGuideTab == key;
+                return ChoiceChip(
+                  label: Text(_capitalize(key)),
+                  selected: isActive,
+                  onSelected: (_) => setState(() => _activeCareGuideTab = key),
+                  selectedColor: const Color(0xFF6F994A),
+                  backgroundColor: const Color(0xFFE9F2DF),
+                  labelStyle: TextStyle(
+                    color: isActive ? Colors.white : const Color(0xFF314022),
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Text(
+                widget.breed.careGuide[_activeCareGuideTab] ??
+                    'Details unavailable.',
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black87,
+                  height: 1.6,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoPill(IconData icon, String label) {
+    return Chip(
+      backgroundColor: const Color(0xFFF0F5EA),
+      avatar: Icon(icon, size: 16, color: const Color(0xFF5A7440)),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 12.5, color: Color(0xFF2F4024)),
+      ),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  String _capitalize(String value) {
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1);
+  }
+}
+
+class _CharacteristicRow extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _CharacteristicRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(characteristic, style: const TextStyle(fontSize: 16, color: Colors.black87)),
-              Text('$percentage%', style: const TextStyle(fontSize: 16, color: Colors.black87)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 15, color: Colors.black87),
+              ),
+              Text(
+                '$value%',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 5),
-          LinearProgressIndicator(
-            value: percentage / 100,
-            backgroundColor: Colors.grey[300],
-            color: const Color(0xFF6F994A),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(5),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCareGuideTab(String tabName) {
-    final bool isActive = _activeCareGuideTab == tabName;
-    return GestureDetector(
-      onTap: () => setState(() => _activeCareGuideTab = tabName),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF6F994A) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? const Color(0xFF6F994A) : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          tabName,
-          style: TextStyle(
-            color: isActive ? Colors.white : Colors.black87,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCareGuideContent() {
-    switch (_activeCareGuideTab) {
-      case 'Nutrition':
-        return Column(children: [
-          _buildInfoCard(icon: Icons.fastfood, title: 'Diet Requirements', content: 'Golden Retrievers need high-quality dog food...'),
-          const SizedBox(height: 15),
-          _buildInfoCard(icon: Icons.monitor_weight, title: 'Weight Management', content: 'Prone to obesity. Monitor weight regularly...'),
-          const SizedBox(height: 15),
-          _buildInfoCard(icon: Icons.block, title: 'Foods to avoid', content: 'Chocolate, grapes, onions, garlic are toxic.'),
-        ]);
-      case 'Grooming':
-        return Column(children: [
-          _buildInfoCard(icon: Icons.brush, title: 'Coat Care', content: 'Brush regularly to prevent matting...'),
-          const SizedBox(height: 15),
-          _buildInfoCard(icon: Icons.content_cut, title: 'Nail Trimming', content: 'Trim nails every 3-4 weeks...'),
-        ]);
-      case 'Exercise':
-        return Column(children: [
-          _buildInfoCard(icon: Icons.directions_run, title: 'Daily Activity', content: 'Requires 60 mins of vigorous exercise daily.'),
-          const SizedBox(height: 15),
-          _buildInfoCard(icon: Icons.sports_tennis, title: 'Mental Stimulation', content: 'Puzzle toys and training sessions help.'),
-        ]);
-      case 'Health':
-        return Column(children: [
-          _buildInfoCard(icon: Icons.local_hospital, title: 'Common Health Issues', content: 'Hip dysplasia, cancer, eye issues.'),
-          const SizedBox(height: 15),
-          _buildInfoCard(icon: Icons.vaccines, title: 'Vaccinations & Parasite Control', content: 'Stay up-to-date with vet visits.'),
-        ]);
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-
-  Widget _buildInfoCard({required IconData icon, required String title, required String content}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 5,
-            spreadRadius: 1,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFC5E7A6),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: const Color(0xFF61972E), size: 24),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 5),
-                Text(content, style: const TextStyle(fontSize: 14, color: Colors.black87)),
-              ],
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: value / 100,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFE2E7DA),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFF6F994A)),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-// LEFT-ALIGNED BREED INFO COLUMN WIDGET
-class _BreedInfoColumn extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _BreedInfoColumn({required this.title, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, // Align text to left
-      children: [
-        Text(title, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-        const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 }

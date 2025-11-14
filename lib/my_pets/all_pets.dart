@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fureverhealthy/my_pets/add_new_pet.dart';
-import 'package:fureverhealthy/appointment.dart';
 import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
 // 1. IMPORT THE NEW REMINDERS TAB FILE
 import 'package:fureverhealthy/reminders_tab.dart';
@@ -208,27 +207,16 @@ class _AllPetsPageState extends State<AllPetsPage>
                           if (docs.isEmpty) {
                             return SizedBox(
                               height: 96,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  const Expanded(
-                                    child: Text(
-                                      'No pets yet. Add your first pet to get started.',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.black54,
-                                      ),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: _AddCircle(
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AddNewPetPage(),
                                     ),
                                   ),
-                                  _AddCircle(
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const AddNewPetPage(),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             );
                           }
@@ -1022,18 +1010,24 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return EmptyStateWidget(
-            iconPath: 'assets/schedule.png',
-            message: 'No vet appointment scheduled yet.',
-            buttonText: 'Add appointment',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AppointmentPage(),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/schedule.png',
+                  width: 80,
+                  height: 80,
+                  color: _mint,
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                const Text(
+                  'No vet appointment scheduled yet.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.black54, fontSize: 14),
+                ),
+              ],
+            ),
           );
         }
 

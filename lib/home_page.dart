@@ -380,11 +380,7 @@ class HomeTab extends StatelessWidget {
                     return ListView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
-                      children: [
-                        const _PetCircle(petName: 'Spencer', petType: 'Dog'),
-                        const SizedBox(width: 10),
-                        const _AddCircle(),
-                      ],
+                      children: [const _AddCircle()],
                     );
                   }
 
@@ -397,11 +393,7 @@ class HomeTab extends StatelessWidget {
                     return ListView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
-                      children: [
-                        const _PetCircle(petName: 'Spencer', petType: 'Dog'),
-                        const SizedBox(width: 10),
-                        const _AddCircle(),
-                      ],
+                      children: [const _AddCircle()],
                     );
                   }
 
@@ -442,22 +434,7 @@ class HomeTab extends StatelessWidget {
                   : null,
               builder: (context, snapshot) {
                 if (FirebaseAuth.instance.currentUser == null) {
-                  return SizedBox(
-                    height: petCardHeight + 30,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: petCardWidth,
-                            child: const _PetDetailCard(height: petCardHeight),
-                          ),
-                          const SizedBox(width: 14),
-                        ],
-                      ),
-                    ),
-                  );
+                  return const SizedBox.shrink();
                 }
 
                 if (!snapshot.hasData) {
@@ -469,22 +446,7 @@ class HomeTab extends StatelessWidget {
 
                 final pets = snapshot.data!.docs;
                 if (pets.isEmpty) {
-                  return SizedBox(
-                    height: petCardHeight + 30,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: petCardWidth,
-                            child: const _PetDetailCard(height: petCardHeight),
-                          ),
-                          const SizedBox(width: 14),
-                        ],
-                      ),
-                    ),
-                  );
+                  return const SizedBox.shrink();
                 }
 
                 // Show horizontal scroll only if 2 or more pets

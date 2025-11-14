@@ -8,12 +8,26 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 
 import 'breed_detail_screen.dart';
+import 'data/pet_guide_data.dart';
 import 'identify_breed_picker_io.dart'
     if (dart.library.html) 'identify_breed_picker_web.dart';
+import 'models/pet_breed.dart';
+import 'services/pet_guide_storage.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
 const _screenBg = Color(0xFFF6F8FB);
+const _geminiApiKey = 'AIzaSyB9nY0XE9phU6nIJZ5OS_s5C6qenabz6bU';
+
+class GeminiException implements Exception {
+  final int? statusCode;
+  final String message;
+
+  const GeminiException({this.statusCode, required this.message});
+
+  @override
+  String toString() => message;
+}
 
 class IdentifyBreedScreen extends StatefulWidget {
   const IdentifyBreedScreen({super.key});
@@ -36,7 +50,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     if (!kIsWeb) {
       _model = GenerativeModel(
         model: 'gemini-2.5-flash',
-        apiKey: 'AIzaSyB9nY0XE9phU6nIJZ5OS_s5C6qenabz6bU', // Replace this
+        apiKey: _geminiApiKey,
       );
     }
   }
@@ -188,6 +202,8 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
         return;
       }
 
+      await _maybeUpdatePetGuide(animalType, data);
+
       // Navigate to detailed breed screen
       if (context.mounted) {
         final result = await Navigator.push<String>(
@@ -214,12 +230,72 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
           Navigator.of(context).pop(result);
         }
       }
+    } on GeminiException catch (e) {
+      Navigator.of(context).pop();
+      _showAlert('Error', e.message);
     } catch (e) {
       Navigator.of(context).pop();
       _showAlert('Error', e.toString());
     } finally {
       setState(() => _isIdentifying = false);
     }
+  }
+
+  Future<void> _maybeUpdatePetGuide(
+    String animalTypeLower,
+    Map<String, dynamic> data,
+  ) async {
+    final breedName = (data['breed'] ?? '').toString();
+    if (breedName.isEmpty) {
+      return;
+    }
+
+    final isDog = animalTypeLower == 'dog';
+    final canonicalName = isDog
+        ? resolveTopDogCanonicalName(breedName)
+        : resolveTopCatCanonicalName(breedName);
+
+    if (canonicalName == null) {
+      return;
+    }
+
+    final petBreed = _petBreedFromData(
+      canonicalName: canonicalName,
+      animalTypeLower: animalTypeLower,
+      data: data,
+    );
+
+    await PetGuideStorage.instance.saveBreedOverride(petBreed);
+  }
+
+  PetBreed _petBreedFromData({
+    required String canonicalName,
+    required String animalTypeLower,
+    required Map<String, dynamic> data,
+  }) {
+    final characteristics = _extractMap(data['characteristics']);
+    final careGuide = _extractMap(data['care_guide']);
+
+    return PetBreed.fromMap({
+      'name': canonicalName,
+      'animalType': animalTypeLower == 'dog' ? 'Dog' : 'Cat',
+      'breedGroup': data['breed_group'] ?? 'Unknown',
+      'size': data['size'] ?? 'Unknown',
+      'lifeSpan': data['life_span'] ?? 'Unknown',
+      'description': data['description'] ?? '',
+      'characteristics': characteristics,
+      'careGuide': careGuide,
+    });
+  }
+
+  Map<String, dynamic> _extractMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return value.map((key, val) => MapEntry(key.toString(), val));
+    }
+    return {};
   }
 
   String _inferMimeType(String fileName) {
@@ -244,10 +320,9 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
   }
 
   Future<String> _generateResponseWeb(String prompt) async {
-    const proxyBase = 'https://cors.isomorphic-git.org/';
-    final targetUrl =
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyB9nY0XE9phU6nIJZ5OS_s5C6qenabz6bU';
-    final uri = Uri.parse('$proxyBase$targetUrl');
+    final uri = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    );
 
     final payload = {
       'contents': [
@@ -267,14 +342,31 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
 
     final response = await http.post(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': _geminiApiKey,
+      },
       body: jsonEncode(payload),
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(
-        'Gemini request failed with status ${response.statusCode}: ${response.body}',
-      );
+      String message =
+          'Gemini request failed with status ${response.statusCode}.';
+      try {
+        final error = jsonDecode(response.body) as Map<String, dynamic>;
+        final errorData = error['error'] as Map<String, dynamic>?;
+        final backendMessage = errorData?['message'] as String?;
+        final status = errorData?['status'] as String?;
+        if (status == 'UNAVAILABLE' || response.statusCode == 503) {
+          message =
+              'Gemini is temporarily overloaded. Please try again in a few moments.';
+        } else if (backendMessage != null && backendMessage.isNotEmpty) {
+          message = backendMessage;
+        }
+      } catch (_) {
+        // Ignore JSON parsing issues and keep default message
+      }
+      throw GeminiException(statusCode: response.statusCode, message: message);
     }
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;

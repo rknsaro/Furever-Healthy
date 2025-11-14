@@ -14,7 +14,8 @@ class CommunityPage extends StatefulWidget {
   State<CommunityPage> createState() => _CommunityPageState();
 }
 
-class _CommunityPageState extends State<CommunityPage> with SingleTickerProviderStateMixin {
+class _CommunityPageState extends State<CommunityPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -45,71 +46,27 @@ class _CommunityPageState extends State<CommunityPage> with SingleTickerProvider
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar with back button and centered "Community"
+              // Top bar with back button only
               Padding(
-                padding: EdgeInsets.only(top: statusBarHeight + 4, left: 8, right: 8),
-                child: Stack(
-                  alignment: Alignment.center,
+                padding: EdgeInsets.only(
+                  top: statusBarHeight + 4,
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
+                ),
+                child: Row(
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 26),
-                        onPressed: () => Navigator.pop(context),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 26,
                       ),
-                    ),
-                    const Center(
-                      child: Text(
-                        'Paw Community',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                        ),
-                      ),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
               ),
-
-              // const SizedBox(height: 10),
-
-              // Header card
-              // Padding(
-              //   padding: const EdgeInsets.symmetric(horizontal: 16),
-              //   child: Container(
-              //     padding: const EdgeInsets.all(16),
-              //     decoration: BoxDecoration(
-              //       color: Colors.white,
-              //       borderRadius: BorderRadius.circular(16),
-              //       boxShadow: [
-              //         BoxShadow(
-              //           color: Colors.black.withOpacity(0.15),
-              //           blurRadius: 8,
-              //           offset: const Offset(0, 3),
-              //         ),
-              //       ],
-              //     ),
-              //     child: Row(
-              //       children: [
-              //         Image.asset('assets/pawscomm.png', height: 35),
-              //         const SizedBox(width: 12),
-              //         const Expanded(
-              //           child: Text(
-              //             'Connect with others, share your stories, and grow together in one friendly space.',
-              //             style: TextStyle(
-              //               fontSize: 15,
-              //               fontWeight: FontWeight.w600,
-              //               color: Colors.black87,
-              //             ),
-              //           ),
-              //         ),
-              //       ],
-              //     ),
-              //   ),
-              // ),
-
-              // const SizedBox(height: 12),
 
               // Tabs
               Container(
@@ -140,9 +97,10 @@ class _CommunityPageState extends State<CommunityPage> with SingleTickerProvider
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
-                  padding: const EdgeInsets.all(16),
                   child: TabBarView(
                     controller: _tabController,
                     children: const [

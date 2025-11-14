@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 
 const _headerGreen = Color(0xFF6F994A);
-const _surfaceGray = Color(0xFFEFF4E8);
 const _textMuted = Color(0xFF8C8C8C);
 
 class CommunityFeedTab extends StatefulWidget {
@@ -35,124 +34,49 @@ class _CommunityFeedTabState extends State<CommunityFeedTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: _surfaceGray,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 16,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 16),
-            for (var i = 0; i < _posts.length; i++) ...[
-              _buildPostCard(context, _posts[i], i),
-            ],
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        top: 16,
+        left: 16,
+        right: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(context),
+          const SizedBox(height: 16),
+          for (var i = 0; i < _posts.length; i++) ...[
+            _buildPostCard(context, _posts[i], i),
           ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: _headerGreen,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
       ),
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 20,
-        right: 20,
-        bottom: 24,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const Text(
-            'Fur Community',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: Colors.white,
+            backgroundImage: const AssetImage('assets/pet_images/luna.png'),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              _posts.first.statusPrompt,
+              style: const TextStyle(color: _textMuted, fontSize: 14),
             ),
           ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                _buildSegmentChip('Feed', isSelected: true),
-                _buildSegmentChip('Forums'),
-                _buildSegmentChip('Events'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: Colors.white,
-                  backgroundImage: const AssetImage(
-                    'assets/pet_images/luna.png',
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _headerGreen, width: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    _posts.first.statusPrompt,
-                    style: const TextStyle(color: _textMuted, fontSize: 14),
-                  ),
-                ),
-                Image.asset('assets/add_post.png', width: 24, height: 24),
-              ],
-            ),
-          ),
+          Image.asset('assets/add_post.png', width: 24, height: 24),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSegmentChip(String label, {bool isSelected = false}) {
-    return Expanded(
-      child: Container(
-        height: 34,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? _headerGreen : Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -162,7 +86,7 @@ class _CommunityFeedTabState extends State<CommunityFeedTab> {
     final reactionCount = post.reactions + (isLiked ? 1 : 0);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -297,9 +221,14 @@ class _CommunityFeedTabState extends State<CommunityFeedTab> {
           ),
         ),
         const SizedBox(width: 16),
+        Image.asset('assets/comment.png', width: 18, height: 18),
+        const SizedBox(width: 6),
         Text(
-          '$comments comments',
-          style: const TextStyle(color: _textMuted, fontSize: 12),
+          '$comments',
+          style: const TextStyle(
+            color: _headerGreen,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );

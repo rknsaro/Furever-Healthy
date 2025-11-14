@@ -3,8 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'signup_page.dart';
 import '../home_page.dart'; // Adjust if home_page is in a different folder
@@ -23,11 +23,67 @@ class _LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
   final _formKey = GlobalKey<FormState>();
 
+  // Keys for SharedPreferences
+  static const String _keyRememberMe = 'remember_me';
+  static const String _keyEmail = 'saved_email';
+  static const String _keyPassword = 'saved_password';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // Load saved email and password when the page initializes
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rememberMe = prefs.getBool(_keyRememberMe) ?? false;
+
+      if (rememberMe) {
+        final savedEmail = prefs.getString(_keyEmail) ?? '';
+        final savedPassword = prefs.getString(_keyPassword) ?? '';
+
+        setState(() {
+          _rememberMe = true;
+          _emailController.text = savedEmail;
+          _passwordController.text = savedPassword;
+        });
+      }
+    } catch (e) {
+      print('Error loading saved credentials: $e');
+    }
+  }
+
+  // Save email and password to SharedPreferences
+  Future<void> _saveCredentials(String email, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyRememberMe, true);
+      await prefs.setString(_keyEmail, email);
+      await prefs.setString(_keyPassword, password);
+    } catch (e) {
+      print('Error saving credentials: $e');
+    }
+  }
+
+  // Clear saved credentials from SharedPreferences
+  Future<void> _clearCredentials() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyRememberMe, false);
+      await prefs.remove(_keyEmail);
+      await prefs.remove(_keyPassword);
+    } catch (e) {
+      print('Error clearing credentials: $e');
+    }
   }
 
   // ✅ Save user data to Firestore
@@ -52,6 +108,13 @@ class _LoginPageState extends State<LoginPage> {
         final userCredential = await FirebaseAuth.instance
             .signInWithEmailAndPassword(email: email, password: password);
         await _saveUserToFirestore(userCredential.user!);
+
+        // Save or clear credentials based on "Remember me" checkbox
+        if (_rememberMe) {
+          await _saveCredentials(email, password);
+        } else {
+          await _clearCredentials();
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -106,38 +169,6 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       print("Google login error: $e");
       _showError("Google sign-in failed. Please try again.");
-    }
-  }
-
-  // ✅ Facebook Login (with better error handling)
-  Future<void> _signInWithFacebook() async {
-    try {
-      final result = await FacebookAuth.instance.login();
-
-      print("Facebook login status: ${result.status}");
-      print("Facebook login message: ${result.message}");
-
-      if (result.status == LoginStatus.success) {
-        final credential = FacebookAuthProvider.credential(
-          result.accessToken!.token,
-        );
-
-        final userCredential = await FirebaseAuth.instance.signInWithCredential(
-          credential,
-        );
-        await _saveUserToFirestore(userCredential.user!);
-
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-        );
-      } else if (result.status == LoginStatus.cancelled) {
-        _showError("Facebook login was cancelled.");
-      } else {
-        _showError("Facebook login failed: ${result.message}");
-      }
-    } catch (e) {
-      print("Facebook login error: $e");
-      _showError("An error occurred during Facebook login. Please try again.");
     }
   }
 
@@ -332,10 +363,14 @@ class _LoginPageState extends State<LoginPage> {
                                     height: 24,
                                     child: Checkbox(
                                       value: _rememberMe,
-                                      onChanged: (value) {
+                                      onChanged: (value) async {
                                         setState(
                                           () => _rememberMe = value ?? false,
                                         );
+                                        // If unchecked, clear saved credentials
+                                        if (!(value ?? false)) {
+                                          await _clearCredentials();
+                                        }
                                       },
                                       activeColor: const Color(0xFF112F15),
                                       checkColor: Colors.white,
@@ -422,26 +457,15 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 20),
 
                           // Social logins
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              GestureDetector(
-                                onTap: _signInWithFacebook,
-                                child: Image.asset(
-                                  'assets/facebook.png',
-                                  width: 40,
-                                  height: 40,
-                                ),
+                          Center(
+                            child: GestureDetector(
+                              onTap: _signInWithGoogle,
+                              child: Image.asset(
+                                'assets/google.png',
+                                width: 40,
+                                height: 40,
                               ),
-                              GestureDetector(
-                                onTap: _signInWithGoogle,
-                                child: Image.asset(
-                                  'assets/google.png',
-                                  width: 40,
-                                  height: 40,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                           const SizedBox(height: 30),
 

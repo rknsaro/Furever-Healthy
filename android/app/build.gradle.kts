@@ -1,17 +1,18 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    kotlin("android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services") // ✅ Correct Kotlin DSL syntax
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.fureverhealthy"
     compileSdk = flutter.compileSdkVersion
 
-    // ✅ Explicitly use NDK 27
+    // Use NDK 27
     ndkVersion = "27.0.12077973"
 
+    // Java 11 (fix for obsolete Java 8 warnings)
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -31,6 +32,7 @@ android {
 
     buildTypes {
         release {
+            // Replace this with release keystore if needed
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -41,15 +43,10 @@ flutter {
 }
 
 dependencies {
-    // Import the Firebase BoM
+    // Firebase BoM controls versions
     implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
-    
-    // Firebase Analytics
+
     implementation("com.google.firebase:firebase-analytics")
-    
-    // Firebase Firestore
     implementation("com.google.firebase:firebase-firestore")
-    
-    // Firebase Auth
     implementation("com.google.firebase:firebase-auth")
 }
