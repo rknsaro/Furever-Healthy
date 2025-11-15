@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:fureverhealthy/my_pets/all_pets.dart'; 
+import 'package:fureverhealthy/my_pets/all_pets.dart';
 
 const _mint = Color(0xFF6F994A);
 
 class AddReminderModalContent extends StatelessWidget {
-  final VoidCallback onClose; 
+  final VoidCallback onClose;
 
   const AddReminderModalContent({super.key, required this.onClose});
 
@@ -24,10 +24,7 @@ class AddReminderModalContent extends StatelessWidget {
             const SizedBox(width: 16),
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
+              style: const TextStyle(fontSize: 16, color: Colors.white),
             ),
           ],
         ),
@@ -38,20 +35,24 @@ class AddReminderModalContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // FIX 1: Remove fixed width constraint here.
-    return Center( // Center the modal content within the Stack/Overlay area
-      child: Padding( // Add horizontal padding directly to the modal content
-        padding: const EdgeInsets.symmetric(horizontal: 16.0), // Padding to match the container's inner padding
+    return Center(
+      // Center the modal content within the Stack/Overlay area
+      child: Padding(
+        // Add horizontal padding directly to the modal content
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16.0,
+        ), // Padding to match the container's inner padding
         child: Container(
           // Allow the container to take the full width minus the parent Padding
           // Set to double.infinity to be as wide as possible
-          width: double.infinity, 
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: _mint, 
-            borderRadius: BorderRadius.circular(16), 
+            color: _mint,
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min, 
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 'Add' Header
@@ -73,23 +74,23 @@ class AddReminderModalContent extends StatelessWidget {
               _buildReminderOption(
                 title: 'Grooming',
                 imagePath: 'assets/grooming_white.png',
-                onTap: onClose, 
+                onTap: onClose,
               ),
               _buildReminderOption(
                 title: 'Feeding',
                 imagePath: 'assets/feeding_white.png',
-                onTap: onClose, 
+                onTap: onClose,
               ),
               _buildReminderOption(
                 title: 'Ongoing Medications',
                 imagePath: 'assets/medicine_white.png',
-                onTap: onClose, 
+                onTap: onClose,
               ),
-              _buildReminderOption(
-                title: 'Vaccines',
-                imagePath: 'assets/vaccine_white.png',
-                onTap: onClose, 
-              ),
+              // _buildReminderOption(
+              //   title: 'Vaccines',
+              //   imagePath: 'assets/vaccine_white.png',
+              //   onTap: onClose,
+              // ),
               const SizedBox(height: 10),
               // 'Close' button
               Align(
@@ -164,10 +165,10 @@ class _RemindersTabState extends State<RemindersTab> {
           GestureDetector(
             onTap: _hideModal, // Hide modal when tapping the barrier
             child: Container(
-              // color: Colors.black54.withOpacity(0.5), 
+              // color: Colors.black54.withOpacity(0.5),
               width: double.infinity,
               height: double.infinity,
-              // The AddReminderModalContent now has its own padding, 
+              // The AddReminderModalContent now has its own padding,
               // so it will stretch wide within this full-sized container.
               child: AddReminderModalContent(onClose: _hideModal),
             ),

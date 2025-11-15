@@ -4,7 +4,9 @@ import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
 // 1. IMPORT THE NEW REMINDERS TAB FILE
 import 'package:fureverhealthy/reminders_tab.dart';
 import 'package:fureverhealthy/recent_notes.dart';
-import 'package:fureverhealthy/my_pets/vaccine.dart';
+import 'package:fureverhealthy/view_all_notes.dart';
+import 'package:fureverhealthy/quick_actions/medications.dart';
+// import 'package:fureverhealthy/my_pets/vaccine.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -356,6 +358,319 @@ class _ProfileTabState extends State<_ProfileTab> {
   List<String> _medicalConcerns = [];
   String? _imageUrl;
   String? _assetPath;
+
+  Widget _buildRecentNotesCard(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || widget.selectedPetId == null) {
+      return _buildCard(
+        title: 'Recent notes',
+        iconPath: 'assets/recent_notes.png',
+        description:
+            'Add a note to record important information about $_petName.',
+        buttonText: 'Add note',
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RecentNotesPage(initialPetName: _petName),
+            ),
+          );
+        },
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('petNotes')
+          .where('userId', isEqualTo: user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildCard(
+            title: 'Recent notes',
+            iconPath: 'assets/recent_notes.png',
+            description:
+                'Add a note to record important information about $_petName.',
+            buttonText: 'Add note',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecentNotesPage(initialPetName: _petName),
+                ),
+              );
+            },
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return _buildCard(
+            title: 'Recent notes',
+            iconPath: 'assets/recent_notes.png',
+            description:
+                'Add a note to record important information about $_petName.',
+            buttonText: 'Add note',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecentNotesPage(initialPetName: _petName),
+                ),
+              );
+            },
+          );
+        }
+
+        // Filter notes by pet name and sort by dateTime
+        final petNameTrimmed = _petName.trim().toLowerCase();
+        final matchingNotes = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final notePetName = (data['petName'] as String?)?.trim() ?? '';
+          // Also check createdAt as fallback if dateTime is missing
+          return notePetName.toLowerCase() == petNameTrimmed;
+        }).toList();
+
+        if (matchingNotes.isEmpty) {
+          return _buildCard(
+            title: 'Recent notes',
+            iconPath: 'assets/recent_notes.png',
+            description:
+                'Add a note to record important information about $_petName.',
+            buttonText: 'Add note',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecentNotesPage(initialPetName: _petName),
+                ),
+              );
+            },
+          );
+        }
+
+        // Sort by dateTime descending (or createdAt as fallback) and get the most recent one
+        matchingNotes.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+
+          // Try dateTime first, then createdAt as fallback
+          Timestamp? aTime = aData['dateTime'] as Timestamp?;
+          Timestamp? bTime = bData['dateTime'] as Timestamp?;
+
+          if (aTime == null) {
+            aTime = aData['createdAt'] as Timestamp?;
+          }
+          if (bTime == null) {
+            bTime = bData['createdAt'] as Timestamp?;
+          }
+
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime); // Descending order
+        });
+
+        final noteDoc = matchingNotes.first;
+        final noteData = noteDoc.data() as Map<String, dynamic>;
+        final noteId = noteDoc.id;
+        final content = noteData['content'] as String? ?? '';
+        final dateTime = noteData['dateTime'] as Timestamp?;
+        final petName = noteData['petName'] as String? ?? _petName;
+        final noteType = noteData['noteType'] as String? ?? 'General';
+        final activityType = noteData['activityType'] as String?;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent notes',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ViewAllNotesPage(petName: _petName),
+                        ),
+                      ).then((result) {
+                        if (result == true) {
+                          setState(() {}); // Refresh to show updated note
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'View all',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RecentNotesPage(
+                        initialPetName: _petName,
+                        noteId: noteId,
+                      ),
+                    ),
+                  ).then((result) {
+                    if (result == true) {
+                      setState(() {}); // Refresh to show updated note
+                    }
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF6F994A),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.note,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Top row: Pet Name (BOLD) on left, Note Type/Activity Type on right
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    petName,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (noteType.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _mint.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          noteType == 'Activity' &&
+                                                  activityType != null &&
+                                                  activityType.isNotEmpty
+                                              ? 'Activity: $activityType'
+                                              : noteType,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: _mint,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Notes content
+                            Text(
+                              content.isNotEmpty ? content : 'No content',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            // Date and Time at bottom
+                            if (dateTime != null)
+                              Text(
+                                DateFormat(
+                                  'd MMM, h:mm a',
+                                ).format(dateTime.toDate()),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildCard({
     required String title,
@@ -839,21 +1154,7 @@ class _ProfileTabState extends State<_ProfileTab> {
           children: [
             _buildProfileHeader(context),
             if (widget.selectedPetId != null) _buildDetailsCard(),
-            _buildCard(
-              title: 'Recent notes',
-              iconPath: 'assets/recent_notes.png',
-              description:
-                  'Add a note to record important information about $_petName.',
-              buttonText: 'Add note',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => RecentNotesPage(initialPetName: _petName),
-                  ),
-                );
-              },
-            ),
+            _buildRecentNotesCard(context),
             _buildCard(
               title: 'Grooming',
               iconPath: 'assets/pet_grooming.png',
@@ -873,23 +1174,28 @@ class _ProfileTabState extends State<_ProfileTab> {
               iconPath: 'assets/pet_medication.png',
               description: 'Keep track of ongoing medications for $_petName.',
               buttonText: 'Add medication',
-              onPressed: () {},
-            ),
-            _buildCard(
-              title: 'Vaccines',
-              iconPath: 'assets/pet_vaccines.png',
-              description:
-                  'Manage upcoming and completed vaccines for $_petName.',
-              buttonText: 'Add vaccine',
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => VaccinePage(petName: _petName),
-                  ),
+                  MaterialPageRoute(builder: (_) => const MedicationsPage()),
                 );
               },
             ),
+            // _buildCard(
+            //   title: 'Vaccines',
+            //   iconPath: 'assets/pet_vaccines.png',
+            //   description:
+            //       'Manage upcoming and completed vaccines for $_petName.',
+            //   buttonText: 'Add vaccine',
+            //   onPressed: () {
+            //     Navigator.push(
+            //       context,
+            //       MaterialPageRoute(
+            //         builder: (context) => VaccinePage(petName: _petName),
+            //       ),
+            //     );
+            //   },
+            // ),
           ],
         ),
       ),
