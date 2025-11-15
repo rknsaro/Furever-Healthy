@@ -8,7 +8,7 @@ class GeminiService {
   // ✅ Use the v1 endpoint and your supported model
   static const String _baseUrl =
       'https://generativelanguage.googleapis.com/v1';
-  static String _model = 'gemini-2.5-flash'; // <-- updated model
+  static final String _model = 'gemini-2.5-flash'; // <-- updated model
 
   static Future<String> getAIResponse(String userMessage) async {
     if (_apiKey.isEmpty) {
