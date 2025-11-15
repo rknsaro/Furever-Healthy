@@ -1,0 +1,736 @@
+import 'package:flutter/material.dart';
+import 'package:fureverhealthy/book_appointment.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fureverhealthy/utils/vet_services_parser.dart';
+import 'package:flutter/foundation.dart';
+
+const _mint = Color(0xFF6F994A);
+const _mintDark = Color(0xFF112F15);
+
+class VetProfilePage extends StatelessWidget {
+  final String vetId;
+  final String vetName;
+  final String vetSpecialty;
+  final int vetRating;
+  final String vetLocation;
+
+  const VetProfilePage({
+    super.key,
+    required this.vetId,
+    required this.vetName,
+    required this.vetSpecialty,
+    required this.vetRating,
+    required this.vetLocation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // Header with profile picture
+          SliverAppBar(
+            expandedHeight: 300,
+            pinned: false,
+            backgroundColor: _mintDark,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              background: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('vets')
+                    .doc(vetId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  String? profileImageUrl;
+                  
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final vetData = snapshot.data!.data() as Map<String, dynamic>;
+                    profileImageUrl = vetData['profileImageUrl'] as String?;
+                  }
+                  
+                  return Container(
+                    decoration: const BoxDecoration(color: _mintDark),
+                    child: Center(
+                      child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                profileImageUrl,
+                                width: 200,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    'assets/vet_doctor.png',
+                                    width: 200,
+                                    height: 200,
+                                    fit: BoxFit.cover,
+                                  );
+                                },
+                              ),
+                            )
+                          : Image.asset(
+                              'assets/vet_doctor.png',
+                              width: 200,
+                              height: 200,
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          // Content
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // White card with name, location, rating - using Transform to overlap
+                Transform.translate(
+                  offset: const Offset(0, -50),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    child: StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('vets')
+                          .doc(vetId)
+                          .snapshots(),
+                      builder: (context, vetSnapshot) {
+                        String displayName = vetName;
+                        String displayLocation = vetLocation;
+                        String displaySpecialty = vetSpecialty;
+                        int displayRating = vetRating;
+                        String? profileImageUrl;
+                        int reviewCount = 0;
+
+                        if (vetSnapshot.hasData && vetSnapshot.data!.exists) {
+                          final vetData =
+                              vetSnapshot.data!.data() as Map<String, dynamic>;
+                          // Get name - try multiple field names
+                          final nameFromData = vetData['name'] as String? ??
+                              vetData['displayName'] as String? ??
+                              vetData['vetName'] as String? ??
+                              vetData['fullName'] as String?;
+                          displayName = nameFromData?.isNotEmpty == true ? nameFromData! : vetName;
+                          
+                          displayLocation =
+                              vetData['location'] as String? ?? vetLocation;
+                          displaySpecialty =
+                              vetData['specialization'] as String? ??
+                              vetData['specialty'] as String? ??
+                              vetSpecialty;
+                          displayRating =
+                              (vetData['rating'] as num?)?.toInt() ?? vetRating;
+                          profileImageUrl = vetData['profileImageUrl'] as String?;
+                        }
+
+                        // Get review count and average rating
+                        return StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('feedback')
+                              .where('vetName', isEqualTo: displayName)
+                              .snapshots(),
+                          builder: (context, reviewCountSnapshot) {
+                            double averageRating = displayRating.toDouble();
+                            
+                            if (reviewCountSnapshot.hasData) {
+                              final feedbackDocs = reviewCountSnapshot.data!.docs;
+                              reviewCount = feedbackDocs.length;
+                              
+                              // Calculate average rating from feedback
+                              if (reviewCount > 0) {
+                                int totalRating = 0;
+                                int ratingCount = 0;
+                                
+                                for (var doc in feedbackDocs) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  final rating = data['rating'] as int?;
+                                  if (rating != null && rating > 0) {
+                                    totalRating += rating;
+                                    ratingCount++;
+                                  }
+                                }
+                                
+                                if (ratingCount > 0) {
+                                  averageRating = totalRating / ratingCount;
+                                }
+                              }
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Vet Name - displayed above specialization
+                                // Always show the name if it exists
+                                if (displayName.isNotEmpty)
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                if (displayName.isNotEmpty)
+                                  const SizedBox(height: 12),
+                                // Specialization
+                                Text(
+                                  displaySpecialty.isNotEmpty ? displaySpecialty : 'General',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.grey[800],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.location_on,
+                                      color: Colors.blue,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      displayLocation,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 20),
+                                    const Icon(
+                                      Icons.star,
+                                      color: Colors.amber,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${averageRating.toStringAsFixed(1)} ($reviewCount)',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                // Services Offered button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: () => _showServicesOffered(context, vetId, displayName),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _mint,
+                                      side: const BorderSide(color: _mint),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Services Offered',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                // Action button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              BookAppointmentPage(
+                                                vetId: vetId,
+                                                vetName: displayName,
+                                                vetSpecialty: displaySpecialty,
+                                                vetRating: displayRating,
+                                                vetStatus: 'Available',
+                                                profileImageUrl: profileImageUrl,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _mint,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Book Appointment',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Recent reviews section
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  color: Colors.white,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Recent reviews',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('vets')
+                            .doc(vetId)
+                            .snapshots(),
+                        builder: (context, vetSnapshot) {
+                          String vetNameForQuery = vetName;
+                          if (vetSnapshot.hasData && vetSnapshot.data!.exists) {
+                            final vetData =
+                                vetSnapshot.data!.data()
+                                    as Map<String, dynamic>;
+                            vetNameForQuery =
+                                vetData['name'] as String? ??
+                                vetData['displayName'] as String? ??
+                                vetName;
+                          }
+
+                          return StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('feedback')
+                                .where('vetName', isEqualTo: vetNameForQuery)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: Text('Error: ${snapshot.error}'),
+                                );
+                              }
+
+                              if (!snapshot.hasData ||
+                                  snapshot.data!.docs.isEmpty) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(20.0),
+                                    child: Text(
+                                      'No reviews yet.',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              final reviews = snapshot.data!.docs.toList()
+                                ..sort((a, b) {
+                                  final aDate =
+                                      (a.data() as Map<String, dynamic>)['date']
+                                          as Timestamp?;
+                                  final bDate =
+                                      (b.data() as Map<String, dynamic>)['date']
+                                          as Timestamp?;
+                                  if (aDate == null && bDate == null) return 0;
+                                  if (aDate == null) return 1;
+                                  if (bDate == null) return -1;
+                                  return bDate.compareTo(
+                                    aDate,
+                                  ); // Descending order
+                                });
+
+                              // Limit to 10 most recent
+                              final limitedReviews = reviews.take(10).toList();
+
+                              return Column(
+                                children: limitedReviews.map((doc) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  final name =
+                                      data['Name'] as String? ?? 'Anonymous';
+                                  final feedback =
+                                      data['Feedback'] as String? ?? '';
+                                  final rating = data['rating'] as int? ?? 0;
+                                  final date = data['date'] as Timestamp?;
+
+                                  int daysAgo = 0;
+                                  if (date != null) {
+                                    final now = DateTime.now();
+                                    final reviewDate = date.toDate();
+                                    daysAgo = now.difference(reviewDate).inDays;
+                                  }
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 16),
+                                    child: _buildReview(
+                                      name: name,
+                                      avatar: 'assets/user_prof.png',
+                                      review: feedback,
+                                      daysAgo: daysAgo,
+                                      rating: rating,
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  /// Fetch vet services with multiple fallback methods
+  static Future<List<Map<String, dynamic>>> _fetchVetServicesWithFallback(String vetId) async {
+    // Try the utility method first
+    var services = await VetServicesParser.fetchVetServices(vetId);
+    
+    if (services.isNotEmpty) {
+      return services;
+    }
+    
+    // If not found, try direct document fetch with multiple formats
+    try {
+      // Try vet_rates_{vetId}
+      var doc = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .doc('vet_rates_$vetId')
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return VetServicesParser.parseVetRatesDocument(data);
+      }
+      
+      // Try querying by vetId field
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .where('vetId', isEqualTo: vetId)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        final data = querySnapshot.docs.first.data();
+        return VetServicesParser.parseVetRatesDocument(data);
+      }
+      
+      // Try just vetId as document ID
+      doc = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .doc(vetId)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return VetServicesParser.parseVetRatesDocument(data);
+      }
+    } catch (e) {
+      debugPrint('Error fetching vet services: $e');
+    }
+    
+    return [];
+  }
+
+  /// Show services offered dialog
+  static void _showServicesOffered(BuildContext context, String vetId, String vetName) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: _mint,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Services Offered',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Content
+              Flexible(
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _fetchVetServicesWithFallback(vetId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: CircularProgressIndicator(color: _mint),
+                        ),
+                      );
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Text(
+                            'Error loading services: ${snapshot.error}',
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Text(
+                            'No services information available.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final allServices = snapshot.data!;
+
+                    if (allServices.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Text(
+                            'No services available.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: allServices.length,
+                      itemBuilder: (context, index) {
+                        final service = allServices[index];
+                        final label = service['label'] as String? ?? 'Unknown Service';
+                        final price = (service['price'] as num?)?.toInt() ?? 0;
+                        final description = service['description'] as String? ?? 
+                                          service['desc'] as String?;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      label,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    'PHP $price',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: _mint,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (description != null && description.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  description,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReview({
+    required String name,
+    required String avatar,
+    required String review,
+    required int daysAgo,
+    int rating = 5,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.asset(
+            avatar,
+            width: 50,
+            height: 50,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: 50,
+                height: 50,
+                color: Colors.grey[300],
+                child: const Icon(Icons.person, color: Colors.grey),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    '$daysAgo Days ago',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: List.generate(
+                  5,
+                  (index) => Icon(
+                    index < rating ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                    size: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                review,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
