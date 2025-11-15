@@ -242,7 +242,9 @@ class _PetBreedDetailPageState extends State<PetBreedDetailPage> {
   @override
   void initState() {
     super.initState();
-    _activeCareGuideTab = 'nutrition';
+    _activeCareGuideTab = widget.breed.careGuide.keys.isNotEmpty
+        ? widget.breed.careGuide.keys.first
+        : 'nutrition';
   }
 
   @override
