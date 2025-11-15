@@ -163,7 +163,7 @@ class _RemindersTabState extends State<RemindersTab> {
           // Tapping this translucent container hides the modal
           GestureDetector(
             onTap: _hideModal, // Hide modal when tapping the barrier
-            child: Container(
+            child: SizedBox(
               // color: Colors.black54.withOpacity(0.5), 
               width: double.infinity,
               height: double.infinity,
