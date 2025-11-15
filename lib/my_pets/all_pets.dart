@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:fureverhealthy/my_pets/add_new_pet.dart';
+import 'package:fureverhealthy/identify_breed.dart';
 import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
+import 'package:fureverhealthy/breed_detail_screen.dart';
+import 'package:fureverhealthy/services/pet_guide_storage.dart';
+import 'package:fureverhealthy/models/pet_breed.dart';
+import 'package:http/http.dart' as http;
+import 'dart:typed_data';
 // 1. IMPORT THE NEW REMINDERS TAB FILE
 import 'package:fureverhealthy/reminders_tab.dart';
 import 'package:fureverhealthy/recent_notes.dart';
@@ -213,7 +218,7 @@ class _AllPetsPageState extends State<AllPetsPage>
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const AddNewPetPage(),
+                                      builder: (_) => const IdentifyBreedScreen(),
                                     ),
                                   ),
                                 ),
@@ -235,7 +240,7 @@ class _AllPetsPageState extends State<AllPetsPage>
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => const AddNewPetPage(),
+                                        builder: (_) => const IdentifyBreedScreen(),
                                       ),
                                     ),
                                   );
@@ -633,9 +638,87 @@ class _ProfileTabState extends State<_ProfileTab> {
               ),
             ),
           _buildMedicalConcerns(),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _viewBreedDetails(context),
+              icon: const Icon(Icons.info_outline, size: 18),
+              label: const Text('View Breed Details'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _mint,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _viewBreedDetails(BuildContext context) async {
+    // Get pet image if available
+    Uint8List? imageBytes;
+    final imageUrl = _imageUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      try {
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode == 200) {
+          imageBytes = response.bodyBytes;
+        }
+      } catch (e) {
+        print('Error loading image: $e');
+      }
+    }
+    
+    // Try to get breed information from PetGuideStorage
+    PetBreed? breedInfo;
+    final species = _petSpecies;
+    final isDog = species?.toLowerCase() == 'dog';
+    final breedName = _petBreed.toLowerCase();
+    
+    try {
+      final overrides = await PetGuideStorage.instance.loadOverrides();
+      final breedMap = isDog ? overrides.dogs : overrides.cats;
+      breedInfo = breedMap[breedName];
+    } catch (e) {
+      print('Error loading breed info: $e');
+    }
+    
+    // Use breed info if available, otherwise use defaults
+    final breedGroup = breedInfo?.breedGroup ?? 'Unknown';
+    final size = breedInfo?.size ?? 'Unknown';
+    final lifeSpan = breedInfo?.lifeSpan ?? 'Unknown';
+    final description = breedInfo?.description.isNotEmpty == true
+        ? breedInfo!.description
+        : 'Breed information for ${_petBreed}.';
+    final characteristics = breedInfo?.characteristics ?? <String, int>{};
+    final careGuide = breedInfo?.careGuide ?? <String, String>{};
+    
+    // Use pet image or create placeholder
+    final finalImageBytes = imageBytes ?? Uint8List(0);
+    
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BreedDetailScreen(
+            imageBytes: finalImageBytes,
+            breed: _petBreed,
+            breedGroup: breedGroup,
+            size: size,
+            lifeSpan: lifeSpan,
+            description: description,
+            characteristics: characteristics,
+            careGuide: careGuide,
+          ),
+        ),
+      );
+    }
   }
 
   Widget _buildProfileHeader(BuildContext context) {

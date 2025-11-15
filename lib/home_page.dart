@@ -3,7 +3,6 @@ import 'package:fureverhealthy/appointment.dart';
 import 'package:fureverhealthy/pet_guide.dart';
 import 'package:fureverhealthy/symptom_check.dart';
 import 'package:fureverhealthy/quick_actions/quick_actions_panel.dart';
-import 'package:fureverhealthy/my_pets/add_new_pet.dart';
 import 'package:fureverhealthy/my_pets/all_pets.dart';
 import 'package:fureverhealthy/my_pets/edit_pet_profile.dart';
 import 'package:fureverhealthy/identify_breed.dart';
@@ -296,38 +295,55 @@ class HomeTab extends StatelessWidget {
                     style: TextStyle(fontSize: 14, color: Colors.black54),
                   ),
                   const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _FilledPillButton(
-                          icon: Icons.camera_alt,
-                          label: 'Identify Breed',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const IdentifyBreedScreen(),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseAuth.instance.currentUser != null
+                        ? FirebaseFirestore.instance
+                              .collection('petInfos')
+                              .where(
+                                'userId',
+                                isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                              )
+                              .snapshots()
+                        : null,
+                    builder: (context, snapshot) {
+                      final hasPets = snapshot.hasData &&
+                          snapshot.data!.docs.isNotEmpty;
+                      
+                      return Row(
+                        children: [
+                          if (!hasPets)
+                            Expanded(
+                              child: _FilledPillButton(
+                                icon: Icons.camera_alt,
+                                label: 'Add first pet',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const IdentifyBreedScreen(),
+                                    ),
+                                  );
+                                },
                               ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _OutlinedPillButton(
-                          icon: Icons.search,
-                          label: 'Symptom Check',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SymptomCheckPage(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                            ),
+                          if (!hasPets) const SizedBox(width: 10),
+                          Expanded(
+                            child: _OutlinedPillButton(
+                              icon: Icons.search,
+                              label: 'Symptom Check',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const SymptomCheckPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -410,11 +426,18 @@ class HomeTab extends StatelessWidget {
                       final petName = petData['name'] as String? ?? 'Unknown';
                       final petType =
                           petData['speciesType'] as String? ?? 'Dog';
+                      final imageUrl = petData['imageUrl'] as String?;
+                      final assetPath = petData['imageAsset'] as String?;
                       return Padding(
                         padding: EdgeInsets.only(
                           right: index == pets.length - 1 ? 0 : 10,
                         ),
-                        child: _PetCircle(petName: petName, petType: petType),
+                        child: _PetCircle(
+                          petName: petName,
+                          petType: petType,
+                          imageUrl: imageUrl,
+                          assetPath: assetPath,
+                        ),
                       );
                     },
                   );
@@ -566,22 +589,64 @@ class _OutlinedPillButton extends StatelessWidget {
 class _PetCircle extends StatelessWidget {
   final String petName;
   final String petType;
+  final String? imageUrl;
+  final String? assetPath;
 
-  const _PetCircle({this.petName = 'Spencer', this.petType = 'Dog'});
+  const _PetCircle({
+    this.petName = 'Spencer',
+    this.petType = 'Dog',
+    this.imageUrl,
+    this.assetPath,
+  });
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildFallback() {
     final iconAsset = petType.toLowerCase() == 'cat'
         ? 'assets/cat.png'
         : 'assets/dog.png';
+    return Container(
+      width: 70,
+      height: 70,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFFE8F3D8),
+      ),
+      child: Center(
+        child: Image.asset(iconAsset, height: 40),
+      ),
+    );
+  }
 
-    return Column(
-      children: [
-        SizedBox(
+  Widget _buildAvatarImage() {
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          imageUrl!,
           width: 70,
           height: 70,
-          child: Center(child: Image.asset(iconAsset, height: 40)),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallback(),
         ),
+      );
+    }
+    if (assetPath != null && assetPath!.isNotEmpty) {
+      return ClipOval(
+        child: Image.asset(
+          assetPath!,
+          width: 70,
+          height: 70,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallback(),
+        ),
+      );
+    }
+    return _buildFallback();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildAvatarImage(),
         const SizedBox(height: 6),
         Text(
           petName,
@@ -601,7 +666,7 @@ class _AddCircle extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const AddNewPetPage()),
+          MaterialPageRoute(builder: (context) => const IdentifyBreedScreen()),
         );
       },
       child: Column(
@@ -658,6 +723,49 @@ class _PetDetailCard extends StatelessWidget {
     final iconAsset = petType.toLowerCase() == 'cat'
         ? 'assets/cat.png'
         : 'assets/dog.png';
+    
+    final imageUrl = petData?['imageUrl'] as String?;
+    final assetPath = petData?['imageAsset'] as String?;
+
+    Widget _buildFallbackAvatar(String icon) {
+      return Container(
+        width: 64,
+        height: 64,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+          ),
+        ),
+        child: Center(child: Image.asset(icon, height: 40)),
+      );
+    }
+
+    Widget _buildPetAvatar() {
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        return ClipOval(
+          child: Image.network(
+            imageUrl,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildFallbackAvatar(iconAsset),
+          ),
+        );
+      }
+      if (assetPath != null && assetPath.isNotEmpty) {
+        return ClipOval(
+          child: Image.asset(
+            assetPath,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildFallbackAvatar(iconAsset),
+          ),
+        );
+      }
+      return _buildFallbackAvatar(iconAsset);
+    }
 
     return Container(
       height: height,
@@ -686,17 +794,7 @@ class _PetDetailCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
-              ),
-            ),
-            child: Center(child: Image.asset(iconAsset, height: 40)),
-          ),
+          _buildPetAvatar(),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
