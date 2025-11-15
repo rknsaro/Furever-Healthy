@@ -76,10 +76,32 @@ class _AppointmentPageState extends State<AppointmentPage> {
                   : null) ??
               'Available';
 
+          // Check for premium status (support multiple field names)
+          final premiumBool = data['premium'] as bool?;
+          final isPremiumBool = data['isPremium'] as bool?;
+          final isPremiumVetBool = data['isPremiumVet'] as bool?;
+          final premiumVetBool = data['premiumVet'] as bool?;
+          final premiumString = data['premium'] as String?;
+          
+          bool isPremium = false;
+          if (premiumBool != null) {
+            isPremium = premiumBool;
+          } else if (isPremiumBool != null) {
+            isPremium = isPremiumBool;
+          } else if (isPremiumVetBool != null) {
+            isPremium = isPremiumVetBool;
+          } else if (premiumVetBool != null) {
+            isPremium = premiumVetBool;
+          } else if (premiumString != null) {
+            isPremium = premiumString.toLowerCase() == 'true';
+          }
+
           final vet = {
             'vetId': doc.id, // Store the document ID as vetId
             'name': data['name'] ?? data['displayName'] ?? 'Unknown Vet',
-            'specialty': data['specialty'] ?? 'General',
+            'specialty': data['specialization'] ?? 
+                         data['specialty'] ?? '',
+            'profileImageUrl': data['profileImageUrl'] as String?,
             'rating': data['rating'] is int
                 ? data['rating']
                 : (data['rating'] is double
@@ -88,6 +110,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
             'location': data['location'] ?? 'Unknown',
             'verified': data['verified'] ?? true,
             'status': status,
+            'isPremium': isPremium,
           };
           vets.add(vet);
 
@@ -100,8 +123,24 @@ class _AppointmentPageState extends State<AppointmentPage> {
           }
         }
 
+        // Sort vets: premium vets first, then by rating (descending)
+        vets.sort((a, b) {
+          final aPremium = a['isPremium'] as bool? ?? false;
+          final bPremium = b['isPremium'] as bool? ?? false;
+          
+          // Premium vets come first
+          if (aPremium && !bPremium) return -1;
+          if (!aPremium && bPremium) return 1;
+          
+          // If both are premium or both are not, sort by rating (descending)
+          final aRating = a['rating'] as int? ?? 0;
+          final bRating = b['rating'] as int? ?? 0;
+          return bRating.compareTo(aRating);
+        });
+
         setState(() {
           allVets = vets;
+          allLocations = locations.toList()..sort();
           // Don't update Location and Specialty - they are fixed
           // filterOptions['Location'] = locations.toList()..sort();
           // filterOptions['Specialty'] = specialties.toList()..sort();
@@ -114,35 +153,56 @@ class _AppointmentPageState extends State<AppointmentPage> {
   }
 
   List<Map<String, dynamic>> get filteredVets {
+    List<Map<String, dynamic>> filtered;
+    
+    // Apply filter if selected
     if (selectedFilterType == null || selectedFilterValue == null) {
-      return allVets;
+      filtered = allVets;
+    } else {
+      filtered = allVets.where((vet) {
+        switch (selectedFilterType) {
+          case 'Location':
+            return vet['location'] == selectedFilterValue;
+          case 'Specialty':
+            return vet['specialty'] == selectedFilterValue;
+          case 'Rating':
+            int filterRating = int.parse(selectedFilterValue!.split(' ')[0]);
+            return vet['rating'] == filterRating;
+          default:
+            return true;
+        }
+      }).toList();
     }
-
-    return allVets.where((vet) {
-      switch (selectedFilterType) {
-        case 'Location':
-          return vet['location'] == selectedFilterValue;
-        case 'Specialty':
-          return vet['specialty'] == selectedFilterValue;
-        case 'Rating':
-          int filterRating = int.parse(selectedFilterValue!.split(' ')[0]);
-          return vet['rating'] == filterRating;
-        default:
-          return true;
-      }
-    }).toList();
+    
+    // Ensure premium vets are always at the top, even after filtering
+    filtered.sort((a, b) {
+      final aPremium = a['isPremium'] as bool? ?? false;
+      final bPremium = b['isPremium'] as bool? ?? false;
+      
+      // Premium vets come first
+      if (aPremium && !bPremium) return -1;
+      if (!aPremium && bPremium) return 1;
+      
+      // If both are premium or both are not, sort by rating (descending)
+      final aRating = a['rating'] as int? ?? 0;
+      final bRating = b['rating'] as int? ?? 0;
+      return bRating.compareTo(aRating);
+    });
+    
+    return filtered;
   }
 
   final List<String> filters = ['Location', 'Specialty', 'Rating'];
 
   // Available filter options for each filter type
   final Map<String, List<String>> filterOptions = {
-    'Location': ['Batangas'],
+    'Location': [''],
     'Specialty': ['Pathology', 'Behaviour', 'Dermatology', 'General'],
-    'Rating': ['5 Stars', '4 Stars', '3 Stars'],
+    'Rating': ['5 Stars', '4 Stars', '3 Stars', '2 Stars', '1 Star'],
   };
 
   List<Map<String, dynamic>> allVets = [];
+  List<String> allLocations = []; // Store all unique locations
 
   @override
   Widget build(BuildContext context) {
@@ -416,6 +476,8 @@ class _AppointmentPageState extends State<AppointmentPage> {
                             vet['location'],
                             vet['status'] as String? ?? 'Available',
                             vet['vetId'] as String,
+                            vet['profileImageUrl'] as String?,
+                            vet['isPremium'] as bool? ?? false,
                           ),
                         ),
                       const SizedBox(height: 20),
@@ -922,39 +984,158 @@ class _AppointmentPageState extends State<AppointmentPage> {
   // Vets will manage status through their own interface
 
   void _showFilterDialog(String filterType) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Select $filterType'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: filterOptions[filterType]!.map((option) {
-                return ListTile(
-                  title: Text(option),
-                  onTap: () {
-                    setState(() {
-                      selectedFilterType = filterType;
-                      selectedFilterValue = option;
-                    });
-                    Navigator.pop(context);
-                  },
-                  selected: selectedFilterValue == option,
-                  selectedTileColor: _mint.withOpacity(0.1),
-                );
-              }).toList(),
+    // For Location filter, use a StatefulBuilder to handle search
+    if (filterType == 'Location') {
+      showDialog(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          final TextEditingController locationSearchController = TextEditingController();
+          
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              String locationSearchQuery = locationSearchController.text;
+              
+              // Filter locations based on search query
+              final filteredLocations = locationSearchQuery.isEmpty
+                  ? allLocations
+                  : allLocations.where((location) {
+                      return location.toLowerCase().contains(locationSearchQuery.toLowerCase());
+                    }).toList();
+
+              return AlertDialog(
+                title: Text('Select $filterType'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Search bar for locations
+                    TextField(
+                      controller: locationSearchController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Search location...',
+                        hintStyle: TextStyle(color: Colors.grey.shade600),
+                        prefixIcon: Icon(Icons.search, color: _mint),
+                        suffixIcon: locationSearchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey.shade600,
+                                ),
+                                onPressed: () {
+                                  locationSearchController.clear();
+                                  setDialogState(() {});
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: _mint, width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: _mint, width: 1.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: _mint, width: 2),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Location list
+                    if (filteredLocations.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          'No Veterinarian information found for this location',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      )
+                    else
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 300),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: filteredLocations.map((location) {
+                              return ListTile(
+                                title: Text(location),
+                                onTap: () {
+                                  setState(() {
+                                    selectedFilterType = filterType;
+                                    selectedFilterValue = location;
+                                  });
+                                  locationSearchController.dispose();
+                                  Navigator.pop(context);
+                                },
+                                selected: selectedFilterValue == location,
+                                selectedTileColor: _mint.withOpacity(0.1),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      locationSearchController.dispose();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } else {
+      // For other filter types, use the original dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Select $filterType'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: filterOptions[filterType]!.map((option) {
+                  return ListTile(
+                    title: Text(option),
+                    onTap: () {
+                      setState(() {
+                        selectedFilterType = filterType;
+                        selectedFilterValue = option;
+                      });
+                      Navigator.pop(context);
+                    },
+                    selected: selectedFilterValue == option,
+                    selectedTileColor: _mint.withOpacity(0.1),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      );
+    }
   }
 
   Widget _doctorCard(
@@ -964,6 +1145,8 @@ class _AppointmentPageState extends State<AppointmentPage> {
     String location,
     String status,
     String vetId,
+    String? profileImageUrl,
+    bool isPremium,
   ) {
     final String normalizedStatus = status.trim().isEmpty
         ? 'Available'
@@ -972,19 +1155,45 @@ class _AppointmentPageState extends State<AppointmentPage> {
     final Color statusColor = isUnavailable ? Colors.red : Colors.green;
     final int ratingClamped = rating.clamp(0, 5);
 
+    // Premium styling
+    final Color premiumColor = const Color(0xFFFFD700); // Gold color
+    final Color cardBorderColor = isPremium 
+        ? premiumColor 
+        : _mint.withOpacity(0.35);
+    final List<BoxShadow> cardShadow = isPremium
+        ? [
+            BoxShadow(
+              color: premiumColor.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+              spreadRadius: 1,
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ]
+        : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 4),
+            ),
+          ];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isPremium 
+            ? const Color(0xFFFFFBE6) // Subtle gold tint for premium
+            : Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _mint.withOpacity(0.35)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(
+          color: cardBorderColor,
+          width: isPremium ? 2.5 : 1.0,
+        ),
+        boxShadow: cardShadow,
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -994,31 +1203,89 @@ class _AppointmentPageState extends State<AppointmentPage> {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: profileImageUrl == null
+                            ? const RadialGradient(
+                                colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                              )
+                            : null,
+                        border: isPremium
+                            ? Border.all(
+                                color: premiumColor,
+                                width: 3,
+                              )
+                            : null,
+                      ),
+                      child: ClipOval(
+                        child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                            ? Image.network(
+                                profileImageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Image.asset(
+                                    'assets/vet_doctor.png',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: RadialGradient(
+                                            colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                                          ),
+                                        ),
+                                        alignment: Alignment.center,
+                                      );
+                                    },
+                                  );
+                                },
+                              )
+                            : Image.asset(
+                                'assets/vet_doctor.png',
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    alignment: Alignment.center,
+                                  );
+                                },
+                              ),
+                      ),
                     ),
-                  ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/vet_doctor.png',
-                      // fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          alignment: Alignment.center,
-                          // child: Icon(
-                          //   Icons.person,
-                          //   color: _mintDark.withOpacity(0.6),
-                          //   size: 24,
-                          // ),
-                        );
-                      },
-                    ),
-                  ),
+                    if (isPremium)
+                      Positioned(
+                        top: -4,
+                        right: -4,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: premiumColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: premiumColor.withOpacity(0.5),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.star,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -1045,20 +1312,76 @@ class _AppointmentPageState extends State<AppointmentPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: _mintDark,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: isPremium ? premiumColor : _mintDark,
+                                    ),
+                                  ),
+                                ),
+                                if (isPremium) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          premiumColor,
+                                          const Color(0xFFFFA500), // Orange
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: premiumColor.withOpacity(0.4),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.stars,
+                                          color: Colors.white,
+                                          size: 14,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'PREMIUM',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Text(
                               specialty,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
-                                color: Colors.black87,
+                                color: isPremium 
+                                    ? Colors.black87 
+                                    : Colors.black87,
+                                fontWeight: isPremium 
+                                    ? FontWeight.w600 
+                                    : FontWeight.normal,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -1077,34 +1400,6 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                       color: Colors.black54,
                                       fontSize: 13,
                                     ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: const [
-                                Text(
-                                  'License Verified',
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  '(',
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Icon(Icons.verified, color: _mint, size: 16),
-                                Text(
-                                  ')',
-                                  style: TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 13,
                                   ),
                                 ),
                               ],
@@ -1215,6 +1510,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                               vetSpecialty: specialty,
                                               vetRating: rating,
                                               vetStatus: normalizedStatus,
+                                              profileImageUrl: profileImageUrl,
                                             ),
                                       ),
                                     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fureverhealthy/utils/vet_services_parser.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
@@ -13,6 +14,7 @@ class BookAppointmentPage extends StatefulWidget {
   final String vetSpecialty;
   final int vetRating;
   final String vetStatus;
+  final String? profileImageUrl;
 
   const BookAppointmentPage({
     super.key,
@@ -21,6 +23,7 @@ class BookAppointmentPage extends StatefulWidget {
     required this.vetSpecialty,
     required this.vetRating,
     required this.vetStatus,
+    this.profileImageUrl,
   });
 
   @override
@@ -123,92 +126,99 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Vet icon
-          Container(
-            width: 55,
-            height: 55,
-            decoration: BoxDecoration(
-              color: _mint.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: const Icon(Icons.person, size: 30, color: _mintDark),
-          ),
-          const SizedBox(width: 15),
+      child: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('vets')
+            .doc(widget.vetId)
+            .snapshots(),
+        builder: (context, snapshot) {
+          String? profileImageUrl = widget.profileImageUrl;
+          
+          if (profileImageUrl == null && snapshot.hasData && snapshot.data!.exists) {
+            final vetData = snapshot.data!.data() as Map<String, dynamic>;
+            profileImageUrl = vetData['profileImageUrl'] as String?;
+          }
 
-          // Vet info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 5 Star Rating
-                Row(
-                  children: List.generate(
-                    widget.vetRating,
-                    (index) =>
-                        const Icon(Icons.star, color: Colors.amber, size: 18),
-                  ),
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Vet profile image
+              Container(
+                width: 55,
+                height: 55,
+                decoration: BoxDecoration(
+                  color: _mint.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(50),
                 ),
-                const SizedBox(height: 4),
-                // Status
-                Row(
+                child: ClipOval(
+                  child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                      ? Image.network(
+                          profileImageUrl,
+                          width: 55,
+                          height: 55,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.person, size: 30, color: _mintDark);
+                          },
+                        )
+                      : const Icon(Icons.person, size: 30, color: _mintDark),
+                ),
+              ),
+              const SizedBox(width: 15),
+
+              // Vet info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.circle, size: 10, color: statusColor),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Status: $normalizedStatus',
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                    // 5 Star Rating
+                    Row(
+                      children: List.generate(
+                        widget.vetRating,
+                        (index) =>
+                            const Icon(Icons.star, color: Colors.amber, size: 18),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    // Status
+                    Row(
+                      children: [
+                        Icon(Icons.circle, size: 10, color: statusColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Status: $normalizedStatus',
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Name
+                    Text(
+                      widget.vetName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _mintDark,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    // Specialty
+                    Text(
+                      widget.vetSpecialty,
+                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                // Name
-                Text(
-                  widget.vetName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _mintDark,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                // Specialty
-                Text(
-                  widget.vetSpecialty,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                ),
-                const SizedBox(height: 4),
-                // License Verified
-                Row(
-                  children: const [
-                    Text(
-                      'License Verified',
-                      style: TextStyle(color: Colors.black54, fontSize: 13),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '(',
-                      style: TextStyle(color: Colors.black54, fontSize: 13),
-                    ),
-                    Icon(Icons.verified, color: _mint, size: 16),
-                    // Text(
-                    //   ')',
-                    //   style: TextStyle(color: Colors.black54, fontSize: 13),
-                    // ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Right arrow icon
-          const Icon(Icons.chevron_right, color: Colors.grey, size: 28),
-        ],
+              ),
+              // Right arrow icon
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 28),
+            ],
+          );
+        },
       ),
     );
   }
@@ -703,65 +713,264 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
     return int.parse(parts[1]);
   }
 
+
   Future<void> _loadReasonsFromDatabase() async {
     setState(() {
       _isLoadingReasons = true;
     });
 
     try {
-      // Fetch app_settings document
-      final settingsDoc = await FirebaseFirestore.instance
-          .collection('app_settings')
-          .doc('appointment_reasons')
+      List<Map<String, dynamic>> allReasons = [];
+      DocumentSnapshot? settingsDoc;
+      Map<String, dynamic>? vetData;
+
+      // FIRST: Try to fetch directly from the vet's document in 'vets' collection
+      // This is where the vet's own prices and appointment reasons should be stored
+      final vetDoc = await FirebaseFirestore.instance
+          .collection('vets')
+          .doc(widget.vetId)
           .get();
 
-      if (settingsDoc.exists) {
-        final data = settingsDoc.data() as Map<String, dynamic>;
-
-        // Get reasons based on vet rating
-        // The structure might be like: { "rating_5": [...], "rating_4": [...], etc. }
-        // Or it might be a single list with rating-based filtering
-        List<Map<String, dynamic>> allReasons = [];
-
-        // Try to get reasons for specific rating first
-        final ratingKey = 'rating_${widget.vetRating}';
-        if (data.containsKey(ratingKey)) {
-          final ratingReasons = data[ratingKey] as List<dynamic>?;
-          if (ratingReasons != null) {
-            allReasons = ratingReasons.map((r) {
-              if (r is Map) {
-                return Map<String, dynamic>.from(r);
+      if (vetDoc.exists) {
+        vetData = vetDoc.data();
+        debugPrint('Loaded vet document: ${vetDoc.id}');
+        debugPrint('Vet document fields: ${vetData?.keys.toList()}');
+        debugPrint('Vet document data: $vetData');
+        
+        // Check if vet document has appointment reasons or prices
+        // Look for common field names: appointmentReasons, reasons, services, prices, etc.
+        if (vetData != null) {
+          // Try to find reasons in the vet document
+          if (vetData.containsKey('appointmentReasons')) {
+            final vetReasons = vetData['appointmentReasons'] as List<dynamic>?;
+            if (vetReasons != null && vetReasons.isNotEmpty) {
+              allReasons = vetReasons.map((r) {
+                if (r is Map) {
+                  // Preserve ALL fields from the reason object
+                  return Map<String, dynamic>.from(r);
+                }
+                return {'label': r.toString(), 'price': 0};
+              }).toList();
+            }
+          } else if (vetData.containsKey('reasons')) {
+            final vetReasons = vetData['reasons'] as List<dynamic>?;
+            if (vetReasons != null && vetReasons.isNotEmpty) {
+              allReasons = vetReasons.map((r) {
+                if (r is Map) {
+                  return Map<String, dynamic>.from(r);
+                }
+                return {'label': r.toString(), 'price': 0};
+              }).toList();
+            }
+          } else if (vetData.containsKey('services')) {
+            final vetServices = vetData['services'];
+            if (vetServices is Map) {
+              // Parse nested services structure
+              allReasons.addAll(VetServicesParser.parseNestedServices(
+                Map<String, dynamic>.from(vetServices)
+              ));
+            } else if (vetServices is List && vetServices.isNotEmpty) {
+              // Handle list format
+              allReasons = vetServices.map((r) {
+                if (r is Map) {
+                  return Map<String, dynamic>.from(r);
+                }
+                return {'label': r.toString(), 'price': 0};
+              }).toList();
+            }
+          } else if (vetData.containsKey('prices')) {
+            // If prices is a map, convert it to a list of reasons
+            final prices = vetData['prices'];
+            if (prices is Map && prices.isNotEmpty) {
+              allReasons = (prices as Map<String, dynamic>).entries.map((entry) {
+                final result = <String, dynamic>{
+                  'label': entry.key,
+                  'price': entry.value is num ? entry.value : 0,
+                };
+                if (entry.value is Map) {
+                  result.addAll(Map<String, dynamic>.from(entry.value as Map));
+                }
+                return result;
+              }).toList();
+            }
+          }
+          
+          // If no structured reasons found, look for any list fields that might contain reasons
+          if (allReasons.isEmpty) {
+            for (var entry in vetData.entries) {
+              if (entry.value is List && (entry.value as List).isNotEmpty) {
+                final listValue = entry.value as List<dynamic>;
+                // Check if it looks like a list of reasons (contains maps)
+                if (listValue.isNotEmpty && listValue.first is Map) {
+                  allReasons = listValue.map((r) {
+                    if (r is Map) {
+                      return Map<String, dynamic>.from(r);
+                    }
+                    return {'label': r.toString(), 'price': 0};
+                  }).toList();
+                  break;
+                }
               }
-              return {'label': r.toString(), 'price': 0};
-            }).toList();
-          }
-        }
-
-        // If no rating-specific reasons, try default or all reasons
-        if (allReasons.isEmpty) {
-          if (data.containsKey('default')) {
-            final defaultReasons = data['default'] as List<dynamic>?;
-            if (defaultReasons != null) {
-              allReasons = defaultReasons.map((r) {
-                if (r is Map) {
-                  return Map<String, dynamic>.from(r);
-                }
-                return {'label': r.toString(), 'price': 0};
-              }).toList();
-            }
-          } else if (data.containsKey('reasons')) {
-            final reasonsList = data['reasons'] as List<dynamic>?;
-            if (reasonsList != null) {
-              allReasons = reasonsList.map((r) {
-                if (r is Map) {
-                  return Map<String, dynamic>.from(r);
-                }
-                return {'label': r.toString(), 'price': 0};
-              }).toList();
             }
           }
         }
+      }
 
+      // SECOND: Try app_settings collection with vet_rates_{vetId} format
+      // This is the PRIMARY location for vet-specific rates (as shown in Firestore console)
+      // Try multiple methods to find the document
+      DocumentSnapshot? foundDoc;
+      
+      // Method 1: Try document ID format: vet_rates_{vetId}
+      settingsDoc = await FirebaseFirestore.instance
+          .collection('app_settings')
+          .doc('vet_rates_${widget.vetId}')
+          .get();
+      
+      if (settingsDoc.exists) {
+        foundDoc = settingsDoc;
+        debugPrint('Found vet_rates document by ID: vet_rates_${widget.vetId}');
+      } else {
+        // Method 2: Query by vetId field
+        debugPrint('Document not found by ID, querying by vetId field...');
+        final querySnapshot = await FirebaseFirestore.instance
+            .collection('app_settings')
+            .where('vetId', isEqualTo: widget.vetId)
+            .limit(1)
+            .get();
+        
+        if (querySnapshot.docs.isNotEmpty) {
+          foundDoc = querySnapshot.docs.first;
+          debugPrint('Found document by vetId field: ${foundDoc.id}');
+        } else {
+          // Method 3: Try just the vetId as document ID
+          settingsDoc = await FirebaseFirestore.instance
+              .collection('app_settings')
+              .doc(widget.vetId)
+              .get();
+          
+          if (settingsDoc.exists) {
+            foundDoc = settingsDoc;
+            debugPrint('Found document by vetId as ID: ${widget.vetId}');
+          }
+        }
+      }
+
+      // If vet_rates document exists, parse it (even if we found some reasons in vet document)
+      // This ensures we get all the structured rates
+      if (foundDoc != null && foundDoc.exists) {
+        final data = foundDoc.data() as Map<String, dynamic>;
+        
+        // Debug: Log all fields in the document
+        debugPrint('=== LOADED VET RATES DOCUMENT ===');
+        debugPrint('Document ID: ${foundDoc.id}');
+        debugPrint('Document fields: ${data.keys.toList()}');
+        debugPrint('Full document data: $data');
+        
+        // Verify vetId matches if field exists
+        if (data.containsKey('vetId')) {
+          final docVetId = data['vetId'] as String?;
+          debugPrint('Document vetId: $docVetId, Expected: ${widget.vetId}');
+          if (docVetId != null && docVetId != widget.vetId) {
+            debugPrint('WARNING: vetId mismatch! Skipping this document.');
+          } else {
+            // Parse all services using shared utility
+            final parsedServices = VetServicesParser.parseVetRatesDocument(data);
+            debugPrint('Parsed ${parsedServices.length} services from document');
+            allReasons.addAll(parsedServices);
+          }
+        } else {
+          // No vetId field, parse anyway (might be the right document)
+          final parsedServices = VetServicesParser.parseVetRatesDocument(data);
+          debugPrint('Parsed ${parsedServices.length} services from document (no vetId field)');
+          allReasons.addAll(parsedServices);
+        }
+      } else if (allReasons.isEmpty) {
+        debugPrint('No vet_rates document found for vetId: ${widget.vetId}');
+        // Fallback: Try other document formats only if vet_rates doesn't exist
+        // Try document ID as the vetId in app_settings
+        settingsDoc = await FirebaseFirestore.instance
+            .collection('app_settings')
+            .doc(widget.vetId)
+            .get();
+
+        // Try with 'appointment_reasons_' prefix
+        if (!settingsDoc.exists) {
+          settingsDoc = await FirebaseFirestore.instance
+              .collection('app_settings')
+              .doc('appointment_reasons_${widget.vetId}')
+              .get();
+        }
+
+        // FOURTH: Fall back to global appointment_reasons document
+        if (!settingsDoc.exists) {
+          settingsDoc = await FirebaseFirestore.instance
+              .collection('app_settings')
+              .doc('appointment_reasons')
+              .get();
+        }
+
+        if (settingsDoc.exists) {
+          final data = settingsDoc.data() as Map<String, dynamic>;
+          
+          // Debug: Log all fields in the document
+          debugPrint('Loaded app_settings document: ${settingsDoc.id}');
+          debugPrint('Document fields: ${data.keys.toList()}');
+          debugPrint('Document data: $data');
+
+          // Parse all services using shared utility
+          allReasons.addAll(VetServicesParser.parseVetRatesDocument(data));
+
+          // Fallback: If no services found, try old format (rating-based or list-based)
+          if (allReasons.isEmpty) {
+            final ratingKey = 'rating_${widget.vetRating}';
+            if (data.containsKey(ratingKey)) {
+              final ratingReasons = data[ratingKey] as List<dynamic>?;
+              if (ratingReasons != null && ratingReasons.isNotEmpty) {
+                allReasons = ratingReasons.map((r) {
+                  if (r is Map) {
+                    return Map<String, dynamic>.from(r);
+                  }
+                  return {'label': r.toString(), 'price': 0};
+                }).toList();
+              }
+            }
+
+            if (allReasons.isEmpty && data.containsKey('default')) {
+              final defaultReasons = data['default'] as List<dynamic>?;
+              if (defaultReasons != null && defaultReasons.isNotEmpty) {
+                allReasons = defaultReasons.map((r) {
+                  if (r is Map) {
+                    return Map<String, dynamic>.from(r);
+                  }
+                  return {'label': r.toString(), 'price': 0};
+                }).toList();
+              }
+            }
+
+            if (allReasons.isEmpty && data.containsKey('reasons')) {
+              final reasonsList = data['reasons'] as List<dynamic>?;
+              if (reasonsList != null && reasonsList.isNotEmpty) {
+                allReasons = reasonsList.map((r) {
+                  if (r is Map) {
+                    return Map<String, dynamic>.from(r);
+                  }
+                  return {'label': r.toString(), 'price': 0};
+                }).toList();
+              }
+            }
+          }
+        }
+      }
+
+      // Debug: Log extracted reasons
+      debugPrint('Extracted ${allReasons.length} reasons from vetId: ${widget.vetId}');
+      for (var i = 0; i < allReasons.length; i++) {
+        debugPrint('Reason $i: ${allReasons[i]}');
+      }
+
+      // Set the reasons (whether from vet document or app_settings)
+      if (allReasons.isNotEmpty) {
         setState(() {
           reasons = allReasons;
           _isLoadingReasons = false;
@@ -838,21 +1047,67 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       ),
       hint: const Text('Select reason'),
       items: reasons.map((r) {
-        final label = r['label'] as String? ?? 'Unknown';
-        final price = (r['price'] as num?)?.toInt() ?? 0;
+        final label = r['label'] as String? ?? 
+                     r['name'] as String? ?? 
+                     r['title'] as String? ?? 
+                     r['reason'] as String? ?? 
+                     'Unknown';
+        final price = (r['price'] as num?)?.toInt() ?? 
+                     (r['cost'] as num?)?.toInt() ?? 
+                     (r['amount'] as num?)?.toInt() ?? 
+                     0;
+        
+        // Build display text with all available information
+        String displayText = label;
+        
+        // Add price if available
+        if (price > 0) {
+          displayText += ' - PHP $price';
+        }
+        
+        // Add description if available
+        final description = r['description'] as String? ?? 
+                          r['desc'] as String? ?? 
+                          r['details'] as String?;
+        if (description != null && description.isNotEmpty) {
+          displayText += '\n$description';
+        }
+        
+        // Add duration if available
+        final duration = r['duration'] as String? ?? 
+                        r['time'] as String?;
+        if (duration != null && duration.isNotEmpty) {
+          displayText += ' (Duration: $duration)';
+        }
+        
         return DropdownMenuItem<String>(
           value: label,
-          child: Text('$label - PHP $price'),
+          child: Text(
+            displayText,
+            style: const TextStyle(fontSize: 14),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
         );
       }).toList(),
       onChanged: (value) {
         final selected = reasons.firstWhere(
-          (r) => r['label'] == value,
+          (r) {
+            final label = r['label'] as String? ?? 
+                         r['name'] as String? ?? 
+                         r['title'] as String? ?? 
+                         r['reason'] as String? ?? 
+                         '';
+            return label == value;
+          },
           orElse: () => {'price': 0},
         );
         setState(() {
           selectedReason = value;
-          estimatedCost = (selected['price'] as num?)?.toInt();
+          // Try multiple price field names
+          estimatedCost = (selected['price'] as num?)?.toInt() ?? 
+                        (selected['cost'] as num?)?.toInt() ?? 
+                        (selected['amount'] as num?)?.toInt();
         });
       },
       value: selectedReason,
