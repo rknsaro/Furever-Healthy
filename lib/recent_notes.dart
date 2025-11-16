@@ -9,8 +9,9 @@ const _screenBg = Color(0xFFF6F8FB);
 
 class RecentNotesPage extends StatefulWidget {
   final String? initialPetName;
+  final String? noteId; // For editing existing notes
 
-  const RecentNotesPage({super.key, this.initialPetName});
+  const RecentNotesPage({super.key, this.initialPetName, this.noteId});
 
   @override
   State<RecentNotesPage> createState() => _RecentNotesPageState();
@@ -28,6 +29,8 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
   final List<String> activityTypes = ['Walk', 'Run', 'Food', 'Water'];
   List<String> _pets = [];
   bool _isLoadingPets = true;
+  bool _isLoadingNote = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -37,12 +40,68 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
       setState(() {}); // Update character count
     });
     _loadPets();
+    if (widget.noteId != null) {
+      _loadNote();
+    }
   }
 
   @override
   void dispose() {
     _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadNote() async {
+    if (widget.noteId == null) return;
+
+    setState(() {
+      _isLoadingNote = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _isLoadingNote = false;
+        });
+        return;
+      }
+
+      final doc = await FirebaseFirestore.instance
+          .collection('petNotes')
+          .doc(widget.noteId)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        setState(() {
+          _noteController.text = data['content'] ?? '';
+          _noteType = data['noteType'] ?? 'General';
+          _activityType = data['activityType'] ?? 'Walk';
+          _selectedPet = data['petName'] ?? widget.initialPetName;
+
+          if (data['dateTime'] != null) {
+            final dateTime = (data['dateTime'] as Timestamp).toDate();
+            _selectedDate = dateTime;
+            _selectedTime = TimeOfDay.fromDateTime(dateTime);
+          }
+          _isLoadingNote = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingNote = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingNote = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading note: $e')));
+      }
+    }
   }
 
   Future<void> _loadPets() async {
@@ -208,6 +267,163 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
     );
   }
 
+  Future<void> _saveNote() async {
+    if (_selectedPet == null || _selectedPet!.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a pet')));
+      return;
+    }
+
+    if (_noteController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a note')));
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to save notes')),
+          );
+        }
+        setState(() {
+          _isSaving = false;
+        });
+        return;
+      }
+
+      // Combine date and time
+      final dateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      );
+
+      final noteData = {
+        'userId': user.uid,
+        'petName': _selectedPet?.trim() ?? '',
+        'content': _noteController.text.trim(),
+        'noteType': _noteType,
+        'activityType': _noteType == 'Activity' ? _activityType : null,
+        'dateTime': Timestamp.fromDate(dateTime),
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      };
+
+      if (widget.noteId != null) {
+        // Update existing note
+        await FirebaseFirestore.instance
+            .collection('petNotes')
+            .doc(widget.noteId)
+            .update(noteData);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Note updated successfully!'),
+              backgroundColor: _mint,
+            ),
+          );
+          Navigator.pop(context, true); // Return true to indicate update
+        }
+      } else {
+        // Create new note
+        await FirebaseFirestore.instance.collection('petNotes').add(noteData);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Note added successfully!'),
+              backgroundColor: _mint,
+            ),
+          );
+          Navigator.pop(context, true); // Return true to indicate creation
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving note: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteNote() async {
+    if (widget.noteId == null) return;
+
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Note'),
+        content: const Text('Are you sure you want to delete this note?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('petNotes')
+          .doc(widget.noteId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note deleted successfully!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.pop(context, true); // Return true to indicate deletion
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting note: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   void _showPetSelectionDialog() {
     if (_isLoadingPets) {
       ScaffoldMessenger.of(
@@ -252,6 +468,29 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
   @override
   Widget build(BuildContext context) {
     final int characterCount = _noteController.text.length;
+
+    if (_isLoadingNote) {
+      return Scaffold(
+        backgroundColor: _screenBg,
+        appBar: AppBar(
+          backgroundColor: _mint,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Note',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 25,
+            ),
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: _screenBg,
@@ -513,7 +752,8 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
             ),
             const SizedBox(height: 24),
 
-            // Add Button
+            // Save/Add Button and Delete Button (if editing)
+            // Save/Add Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -524,25 +764,53 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: () {
-                  // Handle add note logic
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Note added successfully!'),
-                      backgroundColor: _mint,
+                onPressed: _isSaving ? null : _saveNote,
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        widget.noteId != null ? 'Save' : 'Add',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+            if (widget.noteId != null) ...[
+              const SizedBox(height: 12),
+              // Delete Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
                     ),
-                  );
-                },
-                child: const Text(
-                  'Add',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: _isSaving ? null : _deleteNote,
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

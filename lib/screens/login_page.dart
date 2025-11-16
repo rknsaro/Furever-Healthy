@@ -275,12 +275,14 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty)
+                              if (value == null || value.isEmpty) {
                                 return 'Please enter your email';
+                              }
                               if (!RegExp(
                                 r'^[^@]+@[^@]+\.[^@]+',
-                              ).hasMatch(value))
+                              ).hasMatch(value)) {
                                 return 'Enter a valid email';
+                              }
                               return null;
                             },
                           ),
@@ -343,10 +345,12 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             validator: (value) {
-                              if (value == null || value.isEmpty)
+                              if (value == null || value.isEmpty) {
                                 return 'Please enter your password';
-                              if (value.length < 8)
+                              }
+                              if (value.length < 8) {
                                 return 'Password must be at least 8 characters';
+                              }
                               return null;
                             },
                           ),

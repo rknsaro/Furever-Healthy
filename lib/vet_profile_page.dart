@@ -5,9 +5,10 @@ import 'package:fureverhealthy/utils/vet_services_parser.dart';
 import 'package:flutter/foundation.dart';
 
 const _mint = Color(0xFF6F994A);
-const _mintDark = Color(0xFF112F15);
+const _mintLight = Color(0xFFE8F0D6); // Light mint background
+const _mintVeryLight = Color(0xFFF0F7E8); // Very light mint for subtle backgrounds
 
-class VetProfilePage extends StatelessWidget {
+class VetProfilePage extends StatefulWidget {
   final String vetId;
   final String vetName;
   final String vetSpecialty;
@@ -24,62 +25,45 @@ class VetProfilePage extends StatelessWidget {
   });
 
   @override
+  State<VetProfilePage> createState() => _VetProfilePageState();
+}
+
+class _VetProfilePageState extends State<VetProfilePage> {
+  int? selectedRatingFilter; // null means "All", otherwise 1-5 for specific rating
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _mintVeryLight,
       body: CustomScrollView(
         slivers: [
-          // Header with profile picture
+          // Header with profile picture - minimal design
           SliverAppBar(
-            expandedHeight: 300,
-            pinned: false,
-            backgroundColor: _mintDark,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+            expandedHeight: 200,
+            pinned: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.9),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
             flexibleSpace: FlexibleSpaceBar(
-              background: StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('vets')
-                    .doc(vetId)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  String? profileImageUrl;
-                  
-                  if (snapshot.hasData && snapshot.data!.exists) {
-                    final vetData = snapshot.data!.data() as Map<String, dynamic>;
-                    profileImageUrl = vetData['profileImageUrl'] as String?;
-                  }
-                  
-                  return Container(
-                    decoration: const BoxDecoration(color: _mintDark),
-                    child: Center(
-                      child: profileImageUrl != null && profileImageUrl.isNotEmpty
-                          ? ClipOval(
-                              child: Image.network(
-                                profileImageUrl,
-                                width: 200,
-                                height: 200,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Image.asset(
-                                    'assets/vet_doctor.png',
-                                    width: 200,
-                                    height: 200,
-                                    fit: BoxFit.cover,
-                                  );
-                                },
-                              ),
-                            )
-                          : Image.asset(
-                              'assets/vet_doctor.png',
-                              width: 200,
-                              height: 200,
-                              fit: BoxFit.cover,
-                            ),
-                    ),
-                  );
-                },
+              background: Container(
+                color: Colors.transparent,
               ),
             ),
           ),
@@ -88,35 +72,100 @@ class VetProfilePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // White card with name, location, rating - using Transform to overlap
-                Transform.translate(
-                  offset: const Offset(0, -50),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        topRight: Radius.circular(30),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 10,
-                          offset: const Offset(0, -5),
+                // Profile picture floating above content
+                StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('vets')
+                      .doc(widget.vetId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    String? profileImageUrl;
+                    
+                    if (snapshot.hasData && snapshot.data!.exists) {
+                      final vetData = snapshot.data!.data() as Map<String, dynamic>;
+                      profileImageUrl = vetData['profileImageUrl'] as String?;
+                    }
+                    
+                    return Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 20, bottom: 20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                      ],
+                        child: CircleAvatar(
+                          radius: 70,
+                          backgroundColor: Colors.white,
+                          child: CircleAvatar(
+                            radius: 66,
+                            backgroundColor: _mintLight,
+                            child: ClipOval(
+                              child: SizedBox(
+                                width: 132,
+                                height: 132,
+                                child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                                    ? Image.network(
+                                        profileImageUrl,
+                                        width: 132,
+                                        height: 132,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Image.asset(
+                                            'assets/vet_doctor.png',
+                                            width: 132,
+                                            height: 132,
+                                            fit: BoxFit.cover,
+                                          );
+                                        },
+                                      )
+                                    : Image.asset(
+                                        'assets/vet_doctor.png',
+                                        width: 132,
+                                        height: 132,
+                                        fit: BoxFit.cover,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // White card with name, location, rating
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
                     child: StreamBuilder<DocumentSnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('vets')
-                          .doc(vetId)
+                          .doc(widget.vetId)
                           .snapshots(),
                       builder: (context, vetSnapshot) {
-                        String displayName = vetName;
-                        String displayLocation = vetLocation;
-                        String displaySpecialty = vetSpecialty;
-                        int displayRating = vetRating;
+                        String displayName = widget.vetName;
+                        String displayLocation = widget.vetLocation;
+                        String displaySpecialty = widget.vetSpecialty;
+                        int displayRating = widget.vetRating;
                         String? profileImageUrl;
                         int reviewCount = 0;
 
@@ -128,16 +177,16 @@ class VetProfilePage extends StatelessWidget {
                               vetData['displayName'] as String? ??
                               vetData['vetName'] as String? ??
                               vetData['fullName'] as String?;
-                          displayName = nameFromData?.isNotEmpty == true ? nameFromData! : vetName;
+                          displayName = nameFromData?.isNotEmpty == true ? nameFromData! : widget.vetName;
                           
                           displayLocation =
-                              vetData['location'] as String? ?? vetLocation;
+                              vetData['location'] as String? ?? widget.vetLocation;
                           displaySpecialty =
                               vetData['specialization'] as String? ??
                               vetData['specialty'] as String? ??
-                              vetSpecialty;
+                              widget.vetSpecialty;
                           displayRating =
-                              (vetData['rating'] as num?)?.toInt() ?? vetRating;
+                              (vetData['rating'] as num?)?.toInt() ?? widget.vetRating;
                           profileImageUrl = vetData['profileImageUrl'] as String?;
                         }
 
@@ -236,7 +285,7 @@ class VetProfilePage extends StatelessWidget {
                                 SizedBox(
                                   width: double.infinity,
                                   child: OutlinedButton(
-                                    onPressed: () => _showServicesOffered(context, vetId, displayName),
+                                    onPressed: () => _showServicesOffered(context, widget.vetId, displayName),
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: _mint,
                                       side: const BorderSide(color: _mint),
@@ -267,7 +316,7 @@ class VetProfilePage extends StatelessWidget {
                                         MaterialPageRoute(
                                           builder: (context) =>
                                               BookAppointmentPage(
-                                                vetId: vetId,
+                                                vetId: widget.vetId,
                                                 vetName: displayName,
                                                 vetSpecialty: displaySpecialty,
                                                 vetRating: displayRating,
@@ -303,7 +352,6 @@ class VetProfilePage extends StatelessWidget {
                       },
                     ),
                   ),
-                ),
                 const SizedBox(height: 8),
                 // Recent reviews section
                 Container(
@@ -312,22 +360,47 @@ class VetProfilePage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Recent reviews',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Recent reviews',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Rating filter chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildRatingFilterChip('All', null),
+                            const SizedBox(width: 8),
+                            _buildRatingFilterChip('5 Stars', 5),
+                            const SizedBox(width: 8),
+                            _buildRatingFilterChip('4 Stars', 4),
+                            const SizedBox(width: 8),
+                            _buildRatingFilterChip('3 Stars', 3),
+                            const SizedBox(width: 8),
+                            _buildRatingFilterChip('2 Stars', 2),
+                            const SizedBox(width: 8),
+                            _buildRatingFilterChip('1 Star', 1),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),
                       StreamBuilder<DocumentSnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('vets')
-                            .doc(vetId)
+                            .doc(widget.vetId)
                             .snapshots(),
                         builder: (context, vetSnapshot) {
-                          String vetNameForQuery = vetName;
+                          String vetNameForQuery = widget.vetName;
                           if (vetSnapshot.hasData && vetSnapshot.data!.exists) {
                             final vetData =
                                 vetSnapshot.data!.data()
@@ -335,7 +408,7 @@ class VetProfilePage extends StatelessWidget {
                             vetNameForQuery =
                                 vetData['name'] as String? ??
                                 vetData['displayName'] as String? ??
-                                vetName;
+                                widget.vetName;
                           }
 
                           return StreamBuilder<QuerySnapshot>(
@@ -389,8 +462,35 @@ class VetProfilePage extends StatelessWidget {
                                   ); // Descending order
                                 });
 
+                              // Filter by rating if selected
+                              List<QueryDocumentSnapshot> filteredReviews = reviews;
+                              if (selectedRatingFilter != null) {
+                                filteredReviews = reviews.where((doc) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  final rating = data['rating'] as int? ?? 0;
+                                  return rating == selectedRatingFilter;
+                                }).toList();
+                              }
+
                               // Limit to 10 most recent
-                              final limitedReviews = reviews.take(10).toList();
+                              final limitedReviews = filteredReviews.take(10).toList();
+
+                              if (limitedReviews.isEmpty) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20.0),
+                                    child: Text(
+                                      selectedRatingFilter != null
+                                          ? 'No ${selectedRatingFilter}-star reviews yet.'
+                                          : 'No reviews yet.',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
 
                               return Column(
                                 children: limitedReviews.map((doc) {
@@ -507,7 +607,7 @@ class VetProfilePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: _mint,
+                  color: Colors.grey[900],
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
@@ -731,6 +831,57 @@ class VetProfilePage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRatingFilterChip(String label, int? rating) {
+    final isSelected = selectedRatingFilter == rating;
+    return ChoiceChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (rating != null) ...[
+            ...List.generate(5, (index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1),
+                child: Icon(
+                  index < rating ? Icons.star : Icons.star_border,
+                  size: 14,
+                  color: isSelected ? Colors.white : Colors.amber,
+                ),
+              );
+            }),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          selectedRatingFilter = selected ? rating : null;
+        });
+      },
+      selectedColor: _mint,
+      backgroundColor: Colors.grey[200],
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.black87,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? _mint : Colors.grey.shade300,
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
     );
   }
 }

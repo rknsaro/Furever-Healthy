@@ -212,8 +212,7 @@ class _NotificationsListState extends State<_NotificationsList> {
     var hasUpdates = false;
 
     for (final doc in docs) {
-      final status = (doc.data()['status'] as String?) ?? '';
-      final key = '${doc.id}:$status';
+      final key = doc.id;
       if (_markedReadKeys.contains(key)) continue;
       _markedReadKeys.add(key);
       batch.update(doc.reference, {'isRead': true});
@@ -344,29 +343,33 @@ class _NotificationTile extends StatelessWidget {
       final notificationsRef = FirebaseFirestore.instance
           .collection('notifications')
           .doc(docId);
-      final appointmentRef = FirebaseFirestore.instance
-          .collection('user_appointments')
-          .doc(appointmentId);
+      // For appointment-based notifications, also mark dismissed in appointment
+      if (appointmentId.isNotEmpty) {
+        final appointmentRef = FirebaseFirestore.instance
+            .collection('user_appointments')
+            .doc(appointmentId);
+        await FirebaseFirestore.instance.runTransaction((txn) async {
+          final appointmentSnap = await txn.get(appointmentRef);
+          if (appointmentSnap.exists) {
+            final data = appointmentSnap.data()!;
+            final dismissedRaw = data['dismissedNotifications'];
+            final dismissedStatuses = dismissedRaw is Iterable
+                ? dismissedRaw.map((e) => e.toString().toLowerCase()).toSet()
+                : <String>{};
 
-      await FirebaseFirestore.instance.runTransaction((txn) async {
-        final appointmentSnap = await txn.get(appointmentRef);
-        if (appointmentSnap.exists) {
-          final data = appointmentSnap.data()!;
-          final dismissedRaw = data['dismissedNotifications'];
-          final dismissedStatuses = dismissedRaw is Iterable
-              ? dismissedRaw.map((e) => e.toString().toLowerCase()).toSet()
-              : <String>{};
-
-          if (!dismissedStatuses.contains(status)) {
-            dismissedStatuses.add(status);
-            txn.update(appointmentRef, {
-              'dismissedNotifications': dismissedStatuses.toList(),
-            });
+            if (!dismissedStatuses.contains(status)) {
+              dismissedStatuses.add(status);
+              txn.update(appointmentRef, {
+                'dismissedNotifications': dismissedStatuses.toList(),
+              });
+            }
           }
-        }
-
-        txn.delete(notificationsRef);
-      });
+          txn.delete(notificationsRef);
+        });
+      } else {
+        // Generic notifications (e.g., likes) - just delete the notification doc
+        await notificationsRef.delete();
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -390,6 +393,29 @@ class _NotificationTile extends StatelessWidget {
   }
 
   _NotificationContent _buildContent(Map<String, dynamic> data) {
+    // Handle community like notifications
+    final type = (data['type'] as String?)?.toLowerCase().trim();
+    if (type == 'like') {
+      final actorName =
+          (data['actorName'] as String?)?.trim().isNotEmpty == true
+          ? data['actorName'] as String
+          : 'Someone';
+      final message = (data['message'] as String?)?.trim().isNotEmpty == true
+          ? data['message'] as String
+          : '$actorName liked your post';
+      String? timestampText;
+      if (data['createdAt'] is Timestamp) {
+        final created = (data['createdAt'] as Timestamp).toDate();
+        timestampText = DateFormat('MMM d, yyyy • h:mm a').format(created);
+      }
+      return _NotificationContent(
+        status: 'like',
+        title: 'New like',
+        message: message,
+        timestamp: timestampText,
+      );
+    }
+
     final status =
         (data['status'] as String?)?.toLowerCase().trim() ?? 'pending';
     final vetName = (data['vetName'] as String?)?.trim().isNotEmpty == true

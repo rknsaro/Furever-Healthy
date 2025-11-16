@@ -477,21 +477,6 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
           'Breed Information',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              // Return the breed to the previous screen
-              Navigator.of(context).pop(widget.breed);
-            },
-            child: const Text(
-              'Use This Breed',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(

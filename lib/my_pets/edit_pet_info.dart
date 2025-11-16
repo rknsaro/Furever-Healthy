@@ -4,7 +4,11 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../identify_breed.dart';
+import '../home_page.dart';
 import 'almost_done.dart';
 
 const _mint = Color(0xFF6F994A);
@@ -14,6 +18,9 @@ class EditPetInfoPage extends StatefulWidget {
   final int petType; // 0 = dog, 1 = cat
   final XFile? pickedPhoto;
   final Uint8List? pickedBytes;
+  final String? breedFromIdentification;
+  final Uint8List? imageBytesFromIdentification;
+  final bool isFromBreedIdentification;
 
   const EditPetInfoPage({
     super.key,
@@ -21,6 +28,9 @@ class EditPetInfoPage extends StatefulWidget {
     required this.petType,
     this.pickedPhoto,
     this.pickedBytes,
+    this.breedFromIdentification,
+    this.imageBytesFromIdentification,
+    this.isFromBreedIdentification = false,
   });
 
   @override
@@ -31,6 +41,7 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
   int? _selectedGender; // 0 male, 1 female
   String? _selectedBreed;
   DateTime? _birthDate;
+  bool _isSaving = false;
 
   final TextEditingController _weightController = TextEditingController();
 
@@ -304,7 +315,10 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
   @override
   void initState() {
     super.initState();
-    if (_selectedBreed != null) {
+    if (widget.isFromBreedIdentification && widget.breedFromIdentification != null) {
+      _selectedBreed = widget.breedFromIdentification;
+      _breedController.text = widget.breedFromIdentification!;
+    } else if (_selectedBreed != null) {
       _breedController.text = _selectedBreed!;
     }
   }
@@ -346,7 +360,9 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
 
     // Prepare image provider
     ImageProvider? imageProvider;
-    if (widget.pickedBytes != null) {
+    if (widget.isFromBreedIdentification && widget.imageBytesFromIdentification != null) {
+      imageProvider = MemoryImage(widget.imageBytesFromIdentification!);
+    } else if (widget.pickedBytes != null) {
       imageProvider = MemoryImage(widget.pickedBytes!);
     } else if (widget.pickedPhoto != null && !kIsWeb) {
       imageProvider = FileImage(File(widget.pickedPhoto!.path));
@@ -492,17 +508,58 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                             ),
                             const SizedBox(height: 30),
 
-                            // Breed Selection (Modal + Identify Breed)
+                            // Species and Breed Selection (Side by Side)
                             Row(
                               children: [
+                                // Pet Species
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _mint.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(
+                                      color: _mint.withOpacity(0.3),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        widget.petType == 0
+                                            ? Icons.pets
+                                            : Icons.cruelty_free,
+                                        color: _mint,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        widget.petType == 0 ? 'Dog' : 'Cat',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: _mint,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                // Breed Selection
                                 Expanded(
                                   child: GestureDetector(
-                                    onTap: () =>
-                                        _showBreedModal(context, breeds),
+                                    onTap: widget.isFromBreedIdentification
+                                        ? null
+                                        : () => _showBreedModal(context, breeds),
                                     child: Container(
                                       height: 50,
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: widget.isFromBreedIdentification
+                                            ? Colors.grey.shade200
+                                            : Colors.white,
                                         border: Border.all(
                                           color: Colors.grey.shade300,
                                         ),
@@ -517,7 +574,7 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                           Expanded(
                                             child: Text(
                                               _breedController.text.isEmpty
-                                                  ? "${petName}'s breed is"
+                                                  ? "Breed"
                                                   : _breedController.text,
                                               style: TextStyle(
                                                 color:
@@ -531,18 +588,19 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const Icon(
-                                            Icons.keyboard_arrow_down,
-                                            color: Colors.grey,
-                                          ),
+                                          if (!widget.isFromBreedIdentification)
+                                            const Icon(
+                                              Icons.keyboard_arrow_down,
+                                              color: Colors.grey,
+                                            ),
                                         ],
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: SizedBox(
+                                if (!widget.isFromBreedIdentification) ...[
+                                  const SizedBox(width: 10),
+                                  SizedBox(
                                     height: 50,
                                     child: ElevatedButton.icon(
                                       onPressed: _navigateToIdentifyBreed,
@@ -552,7 +610,7 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                         size: 18,
                                       ),
                                       label: const Text(
-                                        "Identify Breed",
+                                        "Identify",
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 13,
@@ -566,10 +624,14 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                             25,
                                           ),
                                         ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 24),
@@ -594,109 +656,108 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                             ),
                             const SizedBox(height: 8),
 
-                            // Birth Date & Weight
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: _pickBirthDate,
-                                    child: AbsorbPointer(
-                                      child: TextField(
-                                        decoration: InputDecoration(
-                                          hintText: "7/11/25",
-                                          hintStyle: TextStyle(
-                                            color: Colors.grey.shade400,
-                                          ),
-                                          suffixIcon: Icon(
-                                            Icons.calendar_today,
-                                            color: _mint,
-                                            size: 20,
-                                          ),
-                                          filled: true,
-                                          fillColor: Colors.white,
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              25,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: Colors.grey.shade300,
-                                            ),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              25,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: Colors.grey.shade300,
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              25,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: Colors.grey.shade300,
-                                            ),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 16,
-                                                vertical: 14,
-                                              ),
-                                        ),
-                                        controller: TextEditingController(
-                                          text: _birthDate == null
-                                              ? ''
-                                              : "${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year % 100}",
-                                        ),
+                            // Birth Date
+                            GestureDetector(
+                              onTap: _pickBirthDate,
+                              child: AbsorbPointer(
+                                child: TextField(
+                                  decoration: InputDecoration(
+                                    hintText: "7/11/25",
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    suffixIcon: Icon(
+                                      Icons.calendar_today,
+                                      color: _mint,
+                                      size: 20,
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey.shade300,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: TextField(
-                                    controller: _weightController,
-                                    keyboardType: TextInputType.number,
-                                    decoration: InputDecoration(
-                                      hintText: "Weight",
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey.shade400,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey.shade300,
                                       ),
-                                      suffixIcon: Icon(
-                                        Icons.monitor_weight_rounded,
-                                        color: _mint,
-                                        size: 20,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(25),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey.shade300,
                                       ),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey.shade300,
-                                        ),
-                                      ),
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 14,
-                                          ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
                                     ),
                                   ),
+                                  controller: TextEditingController(
+                                    text: _birthDate == null
+                                        ? ''
+                                        : "${_birthDate!.day}/${_birthDate!.month}/${_birthDate!.year % 100}",
+                                  ),
                                 ),
-                              ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Weight Label
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                "$petName's weight",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Weight
+                            TextField(
+                              controller: _weightController,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                hintText: "Weight",
+                                hintStyle: TextStyle(
+                                  color: Colors.grey.shade400,
+                                ),
+                                suffixIcon: Icon(
+                                  Icons.monitor_weight_rounded,
+                                  color: _mint,
+                                  size: 20,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 40),
                           ],
@@ -731,8 +792,6 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              _dot(false),
-                              const SizedBox(width: 8),
                               _dot(true),
                               const SizedBox(width: 8),
                               _dot(false),
@@ -740,31 +799,44 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                           ),
                           const Spacer(),
                           GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AlmostDoneScreen(
-                                    petName: widget.petName,
-                                    petType: widget.petType,
-                                    breed: _selectedBreed,
-                                    gender: _selectedGender,
-                                    birthDate: _birthDate,
-                                    weight: _weightController.text.trim(),
-                                    pickedPhoto: widget.pickedPhoto,
-                                    pickedBytes: widget.pickedBytes,
+                            onTap: _isSaving
+                                ? null
+                                : (widget.isFromBreedIdentification
+                                    ? _savePetDirectly
+                                    : () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => AlmostDoneScreen(
+                                              petName: widget.petName,
+                                              petType: widget.petType,
+                                              breed: _selectedBreed,
+                                              gender: _selectedGender,
+                                              birthDate: _birthDate,
+                                              weight: _weightController.text.trim(),
+                                              pickedPhoto: widget.pickedPhoto,
+                                              pickedBytes: widget.pickedBytes,
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                            child: _isSaving
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(_mint),
+                                    ),
+                                  )
+                                : Text(
+                                    widget.isFromBreedIdentification ? 'Save' : 'Next',
+                                    style: TextStyle(
+                                      color: _isSaving ? Colors.grey : _mint,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'Next',
-                              style: TextStyle(
-                                color: _mint,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
                           ),
                         ],
                       ),
@@ -777,6 +849,122 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _savePetDirectly() async {
+    if (_isSaving) return; // Prevent multiple calls
+    
+    setState(() => _isSaving = true);
+    
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to save pet data')),
+          );
+        }
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      String? imageUrl;
+      String? storagePath;
+
+      // Use imageBytesFromIdentification if available, otherwise use pickedBytes or pickedPhoto
+      final imageBytes = widget.imageBytesFromIdentification ?? widget.pickedBytes;
+      final pickedPhoto = widget.pickedPhoto;
+
+      if (imageBytes != null || pickedPhoto != null) {
+        try {
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          storagePath = 'pet_images/${user.uid}/$timestamp.jpg';
+          final storageRef = FirebaseStorage.instance.ref().child(storagePath);
+
+          UploadTask? uploadTask;
+          if (imageBytes != null) {
+            uploadTask = storageRef.putData(
+              imageBytes,
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+          } else if (!kIsWeb && pickedPhoto != null) {
+            final file = File(pickedPhoto.path);
+            uploadTask = storageRef.putFile(
+              file,
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+          } else {
+            storagePath = null;
+            uploadTask = null;
+          }
+
+          if (uploadTask != null) {
+            final snapshot = await uploadTask.whenComplete(() {});
+            imageUrl = await snapshot.ref.getDownloadURL();
+          }
+        } catch (e) {
+          print('Error uploading pet image: $e');
+          storagePath = null;
+        }
+      }
+
+      final gender = _selectedGender == null
+          ? 'Unknown'
+          : (_selectedGender == 0 ? 'Male' : 'Female');
+      final species = widget.petType == 0 ? 'Dog' : 'Cat';
+
+      // Prepare pet data
+      final petData = {
+        'userId': user.uid,
+        'name': widget.petName,
+        'breed': _selectedBreed ?? 'Unknown',
+        'gender': gender,
+        'speciesType': species,
+        'weight': _weightController.text.trim(),
+        'spayedNeutered': 'No',
+        'medicalConcerns': <String>[],
+        'description': '',
+        'imageAsset': 'assets/${widget.petType == 0 ? 'dog' : 'cat'}.png',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (_birthDate != null) 'birthDate': Timestamp.fromDate(_birthDate!),
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (storagePath != null) 'imageStoragePath': storagePath,
+      };
+
+      // Save to Firebase
+      await FirebaseFirestore.instance.collection('petInfos').add(petData);
+
+      // Show snackbar and navigate
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('All Set! Welcome to the family ${widget.petName}!'),
+            backgroundColor: _mint,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate to home page
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving pet: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Widget _dot(bool active) {

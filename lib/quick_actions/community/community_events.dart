@@ -16,7 +16,7 @@ class CommunityEventsTab extends StatelessWidget {
             date: 'August 15, 2025',
             time: '10:00 AM - 3:00 PM',
             location: 'Community Park, Malvar',
-            imageUrl: 'assets/adoption_event.jpeg',
+            // imageUrl: 'assets/adoption_event.jpeg',
           ),
           _buildEventCard(
             title: 'Free Pet Grooming Workshop',
@@ -59,13 +59,19 @@ class CommunityEventsTab extends StatelessWidget {
               child: Image.asset(imageUrl, fit: BoxFit.cover),
             ),
           const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
               const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
               const SizedBox(width: 5),
-              Text('$date at $time', style: const TextStyle(color: Colors.black54, fontSize: 14)),
+              Text(
+                '$date at $time',
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -73,7 +79,10 @@ class CommunityEventsTab extends StatelessWidget {
             children: [
               const Icon(Icons.location_on, size: 16, color: Colors.grey),
               const SizedBox(width: 5),
-              Text(location, style: const TextStyle(color: Colors.black54, fontSize: 14)),
+              Text(
+                location,
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -84,7 +93,9 @@ class CommunityEventsTab extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _mint,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               child: const Text('View Details'),
             ),

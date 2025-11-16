@@ -7,17 +7,17 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 
-import 'breed_detail_screen.dart';
 import 'data/pet_guide_data.dart';
 import 'identify_breed_picker_io.dart'
     if (dart.library.html) 'identify_breed_picker_web.dart';
 import 'models/pet_breed.dart';
 import 'services/pet_guide_storage.dart';
+import 'my_pets/edit_pet_info.dart';
 
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
 const _screenBg = Color(0xFFF6F8FB);
-const _geminiApiKey = 'AIzaSyB9nY0XE9phU6nIJZ5OS_s5C6qenabz6bU';
+const _geminiApiKey = 'AIzaSyDhC2nuwO2mvDCAnVII_Q81oKItEqsvNW4';
 
 class GeminiException implements Exception {
   final int? statusCode;
@@ -92,6 +92,8 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
   }
 
   Future<void> _identifyBreed() async {
+    if (_isIdentifying) return; // Prevent multiple calls
+    
     if (_selectedImageBytes == null) {
       _showAlert(
         'Please upload an image',
@@ -204,30 +206,24 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
 
       await _maybeUpdatePetGuide(animalType, data);
 
-      // Navigate to detailed breed screen
+      // Prompt for pet name, then navigate to EditPetInfoPage
       if (context.mounted) {
-        final result = await Navigator.push<String>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BreedDetailScreen(
-              imageBytes: _selectedImageBytes!,
-              breed: data['breed'] ?? 'Unknown Breed',
-              breedGroup: data['breed_group'] ?? 'Unknown',
-              size: data['size'] ?? 'Unknown',
-              lifeSpan: data['life_span'] ?? 'Unknown',
-              description: data['description'] ?? 'No description available.',
-              characteristics: Map<String, int>.from(
-                (data['characteristics'] as Map<String, dynamic>?) ?? {},
-              ),
-              careGuide: Map<String, dynamic>.from(
-                (data['care_guide'] as Map<String, dynamic>?) ?? {},
+        final breedName = data['breed'] ?? 'Unknown Breed';
+        final petName = await _promptPetName(context, breedName);
+        if (petName != null && petName.isNotEmpty && context.mounted) {
+          final petType = animalType == 'dog' ? 0 : 1;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EditPetInfoPage(
+                petName: petName,
+                petType: petType,
+                breedFromIdentification: data['breed'] ?? 'Unknown Breed',
+                imageBytesFromIdentification: _selectedImageBytes!,
+                isFromBreedIdentification: true,
               ),
             ),
-          ),
-        );
-        // Return the breed to the previous screen if user confirmed it
-        if (result != null && context.mounted) {
-          Navigator.of(context).pop(result);
+          );
         }
       }
     } on GeminiException catch (e) {
@@ -404,6 +400,101 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     );
   }
 
+  Future<String?> _promptPetName(BuildContext context, String breedName) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Pet Name',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _mint.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _mint.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.pets, color: _mint, size: 18),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Your pet is a $breedName!',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _mintDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: "Enter your pet's name",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.of(ctx).pop(name);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _mint,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Continue',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _showExitConfirmation() async {
     bool shouldExit = false;
     await showDialog(
@@ -466,7 +557,9 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: InkWell(
-          onTap: (_selectedImageBytes == null) ? _pickImage : null,
+          onTap: (_selectedImageBytes == null && !_isIdentifying)
+              ? _pickImage
+              : null,
           borderRadius: BorderRadius.circular(12),
           child: _selectedImageBytes != null
               ? ClipRRect(
@@ -502,7 +595,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
 
   Widget _buildActionButton({
     required IconData icon,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
   }) {
     return Material(
       color: Colors.transparent,
@@ -564,11 +657,11 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
                   children: [
                     _buildActionButton(
                       icon: Icons.refresh,
-                      onPressed: _retryUpload,
+                      onPressed: _isIdentifying ? null : _retryUpload,
                     ),
                     _buildActionButton(
                       icon: Icons.check,
-                      onPressed: _identifyBreed,
+                      onPressed: _isIdentifying ? null : _identifyBreed,
                     ),
                   ],
                 ),

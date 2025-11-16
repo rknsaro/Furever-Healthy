@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -197,7 +196,8 @@ class _EditUserProfPageState extends State<EditUserProfPage> {
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('profile_images')
-            .child('${user.uid}.jpg');
+            .child(user.uid)
+            .child('profile.jpg');
 
         if (kIsWeb && _pickedBytes != null) {
           final uploadTask = storageRef.putData(

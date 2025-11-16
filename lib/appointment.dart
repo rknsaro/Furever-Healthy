@@ -100,7 +100,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
             'vetId': doc.id, // Store the document ID as vetId
             'name': data['name'] ?? data['displayName'] ?? 'Unknown Vet',
             'specialty': data['specialization'] ?? 
-                         data['specialty'] ?? '',
+                         data['specialty'] ?? 'Specialty Unavailable',
             'profileImageUrl': data['profileImageUrl'] as String?,
             'rating': data['rating'] is int
                 ? data['rating']
@@ -118,7 +118,10 @@ class _AppointmentPageState extends State<AppointmentPage> {
           if (vet['location'] != null && vet['location'] != 'Unknown') {
             locations.add(vet['location'] as String);
           }
-          if (vet['specialty'] != null) {
+          // Only add specialty to filter list if it's not the default "Specialty Unavailable"
+          if (vet['specialty'] != null && 
+              vet['specialty'] != 'Specialty Unavailable' &&
+              (vet['specialty'] as String).isNotEmpty) {
             specialties.add(vet['specialty'] as String);
           }
         }
@@ -165,14 +168,14 @@ class _AppointmentPageState extends State<AppointmentPage> {
             return vet['location'] == selectedFilterValue;
           case 'Specialty':
             return vet['specialty'] == selectedFilterValue;
-          case 'Rating':
-            int filterRating = int.parse(selectedFilterValue!.split(' ')[0]);
-            return vet['rating'] == filterRating;
           default:
             return true;
         }
       }).toList();
     }
+    
+    // Show all vets (both available and unavailable) in the list
+    // The count badge will only show available vets
     
     // Ensure premium vets are always at the top, even after filtering
     filtered.sort((a, b) {
@@ -192,13 +195,12 @@ class _AppointmentPageState extends State<AppointmentPage> {
     return filtered;
   }
 
-  final List<String> filters = ['Location', 'Specialty', 'Rating'];
+  final List<String> filters = ['Location', 'Specialty'];
 
   // Available filter options for each filter type
   final Map<String, List<String>> filterOptions = {
     'Location': [''],
     'Specialty': ['Pathology', 'Behaviour', 'Dermatology', 'General'],
-    'Rating': ['5 Stars', '4 Stars', '3 Stars', '2 Stars', '1 Star'],
   };
 
   List<Map<String, dynamic>> allVets = [];
@@ -206,6 +208,10 @@ class _AppointmentPageState extends State<AppointmentPage> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return Scaffold(
       backgroundColor: _screenBg,
       body: SafeArea(
@@ -213,11 +219,14 @@ class _AppointmentPageState extends State<AppointmentPage> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: const Text(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 16 : screenWidth * 0.05,
+                vertical: isSmallScreen ? 10 : 12,
+              ),
+              child: Text(
                 'Book an appointment',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 20 : isMediumScreen ? 21 : 22,
                   fontWeight: FontWeight.bold,
                   color: _mintDark,
                 ),
@@ -230,46 +239,54 @@ class _AppointmentPageState extends State<AppointmentPage> {
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 10,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 16 : screenWidth * 0.05,
+                        vertical: isSmallScreen ? 8 : 10,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Appointments',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: isSmallScreen ? 16 : 18,
                                 fontWeight: FontWeight.w600,
                                 color: _mintDark,
                               ),
                             ),
                           ),
                           // Toggle button to go back to vets view
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _showAppointments = false;
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _mint,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: _mint),
-                              ),
-                              child: const Text(
-                                'Back to Vets',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _showAppointments = false;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isSmallScreen ? 12 : 16,
+                                  vertical: isSmallScreen ? 10 : 12,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minHeight: 44,
+                                  minWidth: 100,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _mint,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: _mint),
+                                ),
+                                child: Text(
+                                  'Back to Vets',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: isSmallScreen ? 12 : 14,
+                                  ),
                                 ),
                               ),
                             ),
@@ -279,7 +296,9 @@ class _AppointmentPageState extends State<AppointmentPage> {
                     ),
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 16 : screenWidth * 0.05,
+                        ),
                         child: _buildAppointmentsList(),
                       ),
                     ),
@@ -289,9 +308,9 @@ class _AppointmentPageState extends State<AppointmentPage> {
             else
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 16 : screenWidth * 0.05,
+                    vertical: isSmallScreen ? 8 : 10,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,36 +325,73 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                 children: [
                                   ...filters.map(
                                     (filter) => Padding(
-                                      padding: const EdgeInsets.only(right: 10),
-                                      child: GestureDetector(
-                                        onTap: () => _showFilterDialog(filter),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 14,
-                                            vertical: 8,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: selectedFilterType == filter
-                                                ? _mint
-                                                : Colors.transparent,
-                                            border: Border.all(
-                                              color:
-                                                  selectedFilterType == filter
-                                                  ? _mint
-                                                  : Colors.grey.shade400,
+                                      padding: const EdgeInsets.only(right: 12),
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () => _showFilterDialog(filter),
+                                          borderRadius: BorderRadius.circular(30),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
                                             ),
-                                            borderRadius: BorderRadius.circular(
-                                              30,
+                                            constraints: const BoxConstraints(
+                                              minHeight: 44,
+                                              minWidth: 80,
                                             ),
-                                          ),
-                                          child: Text(
-                                            filter,
-                                            style: TextStyle(
-                                              color:
-                                                  selectedFilterType == filter
-                                                  ? Colors.white
-                                                  : Colors.black87,
-                                              fontWeight: FontWeight.w500,
+                                            decoration: BoxDecoration(
+                                              gradient: selectedFilterType == filter
+                                                  ? LinearGradient(
+                                                      colors: [_mint, _mintDark],
+                                                    )
+                                                  : null,
+                                              color: selectedFilterType == filter
+                                                  ? null
+                                                  : Colors.white,
+                                              border: Border.all(
+                                                color:
+                                                    selectedFilterType == filter
+                                                    ? _mint
+                                                    : Colors.grey.shade300,
+                                                width: selectedFilterType == filter ? 1.5 : 1,
+                                              ),
+                                              borderRadius: BorderRadius.circular(30),
+                                              boxShadow: selectedFilterType == filter
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: _mint.withOpacity(0.3),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(0, 3),
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  _getFilterIcon(filter),
+                                                  size: 16,
+                                                  color: selectedFilterType == filter
+                                                      ? Colors.white
+                                                      : Colors.grey.shade700,
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  filter,
+                                                  style: TextStyle(
+                                                    color:
+                                                        selectedFilterType == filter
+                                                        ? Colors.white
+                                                        : Colors.black87,
+                                                    fontWeight: selectedFilterType == filter
+                                                        ? FontWeight.w600
+                                                        : FontWeight.w500,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -344,38 +400,74 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                   ),
                                   // View Appointments button
                                   Padding(
-                                    padding: const EdgeInsets.only(left: 10),
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          _showAppointments = true;
-                                        });
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _showAppointments
-                                              ? _mint
-                                              : Colors.transparent,
-                                          border: Border.all(
-                                            color: _showAppointments
-                                                ? _mint
-                                                : Colors.grey.shade400,
+                                    padding: const EdgeInsets.only(left: 0),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            _showAppointments = true;
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(30),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
                                           ),
-                                          borderRadius: BorderRadius.circular(
-                                            30,
+                                          constraints: const BoxConstraints(
+                                            minHeight: 44,
                                           ),
-                                        ),
-                                        child: Text(
-                                          'View Appointments',
-                                          style: TextStyle(
+                                          decoration: BoxDecoration(
+                                            gradient: _showAppointments
+                                                ? LinearGradient(
+                                                    colors: [_mint, _mintDark],
+                                                  )
+                                                : null,
                                             color: _showAppointments
-                                                ? Colors.white
-                                                : Colors.black87,
-                                            fontWeight: FontWeight.w500,
+                                                ? null
+                                                : Colors.white,
+                                            border: Border.all(
+                                              color: _showAppointments
+                                                  ? _mint
+                                                  : Colors.grey.shade300,
+                                              width: _showAppointments ? 1.5 : 1,
+                                            ),
+                                            borderRadius: BorderRadius.circular(30),
+                                            boxShadow: _showAppointments
+                                                ? [
+                                                    BoxShadow(
+                                                      color: _mint.withOpacity(0.3),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(0, 3),
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.calendar_today,
+                                                size: 16,
+                                                color: _showAppointments
+                                                    ? Colors.white
+                                                    : Colors.grey.shade700,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'View Appointments',
+                                                style: TextStyle(
+                                                  color: _showAppointments
+                                                      ? Colors.white
+                                                      : Colors.black87,
+                                                  fontWeight: _showAppointments
+                                                      ? FontWeight.w600
+                                                      : FontWeight.w500,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -388,16 +480,36 @@ class _AppointmentPageState extends State<AppointmentPage> {
                           if (selectedFilterType != null)
                             Padding(
                               padding: const EdgeInsets.only(left: 8),
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    selectedFilterType = null;
-                                    selectedFilterValue = null;
-                                  });
-                                },
-                                child: const Icon(
-                                  Icons.clear,
-                                  color: Colors.red,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() {
+                                      selectedFilterType = null;
+                                      selectedFilterValue = null;
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 44,
+                                      minHeight: 44,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade50,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.red.shade300,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.clear,
+                                      color: Colors.red.shade700,
+                                      size: 18,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -409,21 +521,73 @@ class _AppointmentPageState extends State<AppointmentPage> {
                       if (selectedFilterValue != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                            horizontal: 14,
+                            vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: _mint.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            gradient: LinearGradient(
+                              colors: [
+                                _mint.withOpacity(0.15),
+                                _mint.withOpacity(0.08),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _mint.withOpacity(0.4),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _mint.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              Icon(
+                                _getFilterIcon(selectedFilterType!),
+                                size: 16,
+                                color: _mintDark,
+                              ),
+                              const SizedBox(width: 8),
                               Text(
-                                '$selectedFilterType: $selectedFilterValue',
-                                style: const TextStyle(
+                                '$selectedFilterType: ',
+                                style: TextStyle(
                                   color: _mintDark,
                                   fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                selectedFilterValue!,
+                                style: TextStyle(
+                                  color: _mintDark,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    selectedFilterType = null;
+                                    selectedFilterValue = null;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Colors.red.shade700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -431,15 +595,101 @@ class _AppointmentPageState extends State<AppointmentPage> {
                         ),
                       const SizedBox(height: 20),
 
-                      Text(
-                        filteredVets.isEmpty
-                            ? 'No vets found'
-                            : 'Available Veterinarians',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: _mintDark,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              filteredVets.isEmpty
+                                  ? 'No veterinarians found'
+                                  : 'Veterinarians',
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 18 : isMediumScreen ? 19 : 20,
+                                fontWeight: FontWeight.w700,
+                                color: _mintDark,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ),
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('vets')
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              // Get total count from filtered list (respects all filters)
+                              int totalCount = filteredVets.length;
+                              int availableCount = 0;
+                              
+                              // Create a map of vet IDs to their real-time status
+                              final vetStatusMap = <String, String>{};
+                              
+                              if (snapshot.hasData) {
+                                // Build a map of vet IDs to their real-time status
+                                for (var doc in snapshot.data!.docs) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  final vetId = doc.id;
+                                  
+                                  // Get status from real-time data
+                                  final String status =
+                                      (data['status'] as String?) ??
+                                      (data['availability'] as String?) ??
+                                      (data['availabilityStatus'] as String?) ??
+                                      ((data['isAvailable'] is bool)
+                                          ? ((data['isAvailable'] as bool)
+                                                ? 'Available'
+                                                : 'Unavailable')
+                                          : null) ??
+                                      'Available';
+                                  
+                                  vetStatusMap[vetId] = status.toLowerCase().trim();
+                                }
+                              }
+                              
+                              // Count available vets from the filtered list
+                              for (var vet in filteredVets) {
+                                final vetId = vet['vetId'] as String;
+                                
+                                // Get status from real-time map if available, otherwise use cached status
+                                String status;
+                                if (vetStatusMap.containsKey(vetId)) {
+                                  status = vetStatusMap[vetId]!;
+                                } else {
+                                  // Fallback to cached status
+                                  status = (vet['status'] as String? ?? '').toLowerCase().trim();
+                                }
+                                
+                                // Count if available
+                                if (status == 'available') {
+                                  availableCount++;
+                                }
+                              }
+                              
+                              if (totalCount > 0)
+                                return Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isSmallScreen ? 10 : 12,
+                                    vertical: isSmallScreen ? 5 : 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _mint.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: _mint.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '$availableCount of $totalCount available',
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 10 : 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _mintDark,
+                                    ),
+                                  ),
+                                );
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
 
@@ -1102,34 +1352,67 @@ class _AppointmentPageState extends State<AppointmentPage> {
       );
     } else {
       // For other filter types, use the original dialog
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      
       showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Text('Select $filterType'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: filterOptions[filterType]!.map((option) {
-                  return ListTile(
-                    title: Text(option),
-                    onTap: () {
-                      setState(() {
-                        selectedFilterType = filterType;
-                        selectedFilterValue = option;
-                      });
-                      Navigator.pop(context);
-                    },
-                    selected: selectedFilterValue == option,
-                    selectedTileColor: _mint.withOpacity(0.1),
-                  );
-                }).toList(),
+            title: Text(
+              'Select $filterType',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 18 : 20,
+              ),
+            ),
+            contentPadding: EdgeInsets.fromLTRB(
+              isSmallScreen ? 16 : 24,
+              isSmallScreen ? 12 : 20,
+              isSmallScreen ? 16 : 24,
+              isSmallScreen ? 12 : 20,
+            ),
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: filterOptions[filterType]!.map((option) {
+                    return ListTile(
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8 : 16,
+                        vertical: isSmallScreen ? 4 : 8,
+                      ),
+                      title: Text(
+                        option,
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 14 : 16,
+                        ),
+                      ),
+                      onTap: () {
+                        setState(() {
+                          selectedFilterType = filterType;
+                          selectedFilterValue = option;
+                        });
+                        Navigator.pop(context);
+                      },
+                      selected: selectedFilterValue == option,
+                      selectedTileColor: _mint.withOpacity(0.1),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 14 : 16,
+                  ),
+                ),
               ),
             ],
           );
@@ -1148,12 +1431,15 @@ class _AppointmentPageState extends State<AppointmentPage> {
     String? profileImageUrl,
     bool isPremium,
   ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final String normalizedStatus = status.trim().isEmpty
         ? 'Available'
         : status.trim();
     final bool isUnavailable = normalizedStatus.toLowerCase() == 'unavailable';
     final Color statusColor = isUnavailable ? Colors.red : Colors.green;
-    final int ratingClamped = rating.clamp(0, 5);
 
     // Premium styling
     final Color premiumColor = const Color(0xFFFFD700); // Gold color
@@ -1183,20 +1469,38 @@ class _AppointmentPageState extends State<AppointmentPage> {
           ];
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 14 : 18),
       decoration: BoxDecoration(
         color: isPremium 
             ? const Color(0xFFFFFBE6) // Subtle gold tint for premium
             : Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
         border: Border.all(
           color: cardBorderColor,
-          width: isPremium ? 2.5 : 1.0,
+          width: isPremium ? 2.5 : 1.5,
         ),
         boxShadow: cardShadow,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VetProfilePage(
+                  vetId: vetId,
+                  vetName: name,
+                  vetSpecialty: specialty,
+                  vetRating: rating,
+                  vetLocation: location,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
+          child: Padding(
+            padding: EdgeInsets.all(isSmallScreen ? 14 : isMediumScreen ? 16 : 20),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1207,8 +1511,8 @@ class _AppointmentPageState extends State<AppointmentPage> {
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 60,
-                      height: 60,
+                      width: isSmallScreen ? 60 : isMediumScreen ? 65 : 70,
+                      height: isSmallScreen ? 60 : isMediumScreen ? 65 : 70,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: profileImageUrl == null
@@ -1216,64 +1520,104 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                 colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
                               )
                             : null,
-                        border: isPremium
-                            ? Border.all(
-                                color: premiumColor,
-                                width: 3,
-                              )
-                            : null,
+                        border: Border.all(
+                          color: isPremium ? premiumColor : Colors.grey.shade300,
+                          width: isPremium ? 3 : 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: ClipOval(
                         child: profileImageUrl != null && profileImageUrl.isNotEmpty
                             ? Image.network(
                                 profileImageUrl,
+                                width: isSmallScreen ? 60 : isMediumScreen ? 65 : 70,
+                                height: isSmallScreen ? 60 : isMediumScreen ? 65 : 70,
                                 fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  final size = isSmallScreen ? 60.0 : isMediumScreen ? 65.0 : 70.0;
+                                  return Container(
+                                    width: size,
+                                    height: size,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.grey[200],
+                                    ),
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        value: loadingProgress.expectedTotalBytes != null
+                                            ? loadingProgress.cumulativeBytesLoaded /
+                                                loadingProgress.expectedTotalBytes!
+                                            : null,
+                                        strokeWidth: 2,
+                                        color: _mint,
+                                      ),
+                                    ),
+                                  );
+                                },
                                 errorBuilder: (context, error, stackTrace) {
-                                  return Image.asset(
-                                    'assets/vet_doctor.png',
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          gradient: RadialGradient(
-                                            colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
-                                          ),
-                                        ),
-                                        alignment: Alignment.center,
-                                      );
-                                    },
+                                  final size = isSmallScreen ? 60.0 : isMediumScreen ? 65.0 : 70.0;
+                                  return Container(
+                                    width: size,
+                                    height: size,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.person,
+                                      size: isSmallScreen ? 30 : isMediumScreen ? 32 : 35,
+                                      color: _mintDark,
+                                    ),
                                   );
                                 },
                               )
-                            : Image.asset(
-                                'assets/vet_doctor.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    alignment: Alignment.center,
-                                  );
-                                },
+                            : Container(
+                                width: isSmallScreen ? 60 : isMediumScreen ? 65 : 70,
+                                height: isSmallScreen ? 60 : isMediumScreen ? 65 : 70,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: RadialGradient(
+                                    colors: [Color(0xFFDFFCF4), Color(0xBFB9E591)],
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.person,
+                                  size: isSmallScreen ? 30 : isMediumScreen ? 32 : 35,
+                                  color: _mintDark,
+                                ),
                               ),
                       ),
                     ),
                     if (isPremium)
                       Positioned(
-                        top: -4,
-                        right: -4,
+                        top: -2,
+                        right: -2,
                         child: Container(
-                          padding: const EdgeInsets.all(3),
+                          padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: premiumColor,
+                            gradient: LinearGradient(
+                              colors: [premiumColor, const Color(0xFFFFA500)],
+                            ),
                             shape: BoxShape.circle,
                             border: Border.all(
                               color: Colors.white,
-                              width: 2,
+                              width: 2.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: premiumColor.withOpacity(0.5),
-                                blurRadius: 4,
+                                color: premiumColor.withOpacity(0.6),
+                                blurRadius: 6,
+                                spreadRadius: 1,
                                 offset: const Offset(0, 2),
                               ),
                             ],
@@ -1281,26 +1625,112 @@ class _AppointmentPageState extends State<AppointmentPage> {
                           child: const Icon(
                             Icons.star,
                             color: Colors.white,
-                            size: 14,
+                            size: 12,
                           ),
                         ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      index < ratingClamped ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                      size: 16,
+                SizedBox(height: isSmallScreen ? 10 : 12),
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('feedback')
+                      .where('vetName', isEqualTo: name)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    double averageRating = 0.0;
+                    int reviewCount = 0;
+                    
+                    if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                      int totalRating = 0;
+                      reviewCount = snapshot.data!.docs.length;
+                      
+                      for (var doc in snapshot.data!.docs) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final ratingValue = data['rating'] as int? ?? 0;
+                        totalRating += ratingValue;
+                      }
+                      
+                      if (reviewCount > 0) {
+                        averageRating = totalRating / reviewCount;
+                      }
+                    }
+                    
+                    // If no feedback, show 0.0 instead of default rating
+                    if (reviewCount == 0) {
+                      averageRating = 0.0;
+                    }
+                    
+                    // If no ratings, don't show stars at all
+                    if (reviewCount == 0) {
+                      return Column(
+                        children: [
+                          Text(
+                            'No ratings yet',
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 11 : isMediumScreen ? 12 : 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    
+                    // Use the exact average rating for stars (not rounded) to match numeric display
+                    final ratingClamped = averageRating.clamp(0.0, 5.0);
+                    
+                    return Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            // Show filled star if index is less than the average rating
+                            // Show half star if the average is between index and index+1
+                            final starValue = index + 1;
+                            final isFilled = starValue <= ratingClamped;
+                            final isHalfFilled = starValue - 0.5 <= ratingClamped && ratingClamped < starValue;
+                            
+                            return Padding(
+                              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 1 : 1.5),
+                              child: isHalfFilled
+                                  ? Icon(
+                                      Icons.star_half,
+                                      color: Colors.amber,
+                                      size: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+                                    )
+                                  : Icon(
+                                      isFilled ? Icons.star : Icons.star_border,
+                                      color: Colors.amber,
+                                      size: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+                                    ),
+                            );
+                          }),
+                        ),
+                        SizedBox(height: isSmallScreen ? 4 : 6),
+                        Text(
+                          averageRating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                        Text(
+                          '($reviewCount ${reviewCount == 1 ? 'review' : 'reviews'})',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 9 : 10,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     );
-                  }),
+                  },
                 ),
               ],
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: isSmallScreen ? 12 : isMediumScreen ? 14 : 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1314,144 +1744,227 @@ class _AppointmentPageState extends State<AppointmentPage> {
                           children: [
                             Row(
                               children: [
-                                Expanded(
+                                Flexible(
                                   child: Text(
                                     name,
                                     style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: isSmallScreen ? 16 : isMediumScreen ? 17 : 19,
+                                      fontWeight: FontWeight.w800,
                                       color: isPremium ? premiumColor : _mintDark,
+                                      letterSpacing: -0.3,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: isSmallScreen ? 4 : 6),
+                            Row(
+                              children: [
+                                Icon(
+                                  _getSpecialtyIcon(specialty),
+                                  size: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+                                  color: _getSpecialtyColor(specialty),
+                                ),
+                                SizedBox(width: isSmallScreen ? 4 : 6),
+                                Expanded(
+                                  child: Text(
+                                    specialty.isNotEmpty ? specialty : 'Specialty Unavailable',
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
+                                      color: _getSpecialtyColor(specialty),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: isSmallScreen ? 4 : 6),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: _mint,
+                                  size: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+                                ),
+                                SizedBox(width: isSmallScreen ? 3 : 4),
+                                Flexible(
+                                  child: Text(
+                                    location,
+                                    style: TextStyle(
+                                      color: Colors.black54,
+                                      fontSize: isSmallScreen ? 11 : isMediumScreen ? 12 : 13,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 10 : isMediumScreen ? 11 : 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          IntrinsicWidth(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: isSmallScreen ? 8 : 10,
+                                    vertical: isSmallScreen ? 5 : 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: isUnavailable
+                                        ? null
+                                        : LinearGradient(
+                                            colors: [
+                                              statusColor.withOpacity(0.15),
+                                              statusColor.withOpacity(0.08),
+                                            ],
+                                          ),
+                                    color: isUnavailable
+                                        ? Colors.red.shade50
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: statusColor.withOpacity(0.5),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: statusColor.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: isSmallScreen ? 6 : 7,
+                                        height: isSmallScreen ? 6 : 7,
+                                        decoration: BoxDecoration(
+                                          color: statusColor,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: statusColor.withOpacity(0.5),
+                                              blurRadius: 4,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(width: isSmallScreen ? 5 : 6),
+                                      Text(
+                                        normalizedStatus,
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontSize: isSmallScreen ? 10 : isMediumScreen ? 11 : 12,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 if (isPremium) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          premiumColor,
-                                          const Color(0xFFFFA500), // Orange
+                                  SizedBox(height: isSmallScreen ? 6 : 8),
+                                  Center(
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: isSmallScreen ? 8 : 10,
+                                        vertical: isSmallScreen ? 4 : 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            premiumColor,
+                                            const Color(0xFFFFA500), // Orange
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: premiumColor.withOpacity(0.5),
+                                            blurRadius: 6,
+                                            spreadRadius: 1,
+                                            offset: const Offset(0, 3),
+                                          ),
                                         ],
                                       ),
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: premiumColor.withOpacity(0.4),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.stars,
-                                          color: Colors.white,
-                                          size: 14,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        const Text(
-                                          'PREMIUM',
-                                          style: TextStyle(
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.workspace_premium,
                                             color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.5,
+                                            size: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
                                           ),
-                                        ),
-                                      ],
+                                          SizedBox(width: isSmallScreen ? 4 : 5),
+                                          Text(
+                                            'PREMIUM',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: isSmallScreen ? 9 : 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              specialty,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: isPremium 
-                                    ? Colors.black87 
-                                    : Colors.black87,
-                                fontWeight: isPremium 
-                                    ? FontWeight.w600 
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.location_on,
-                                  color: _mint,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    location,
-                                    style: const TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: statusColor.withOpacity(0.4),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.circle, color: statusColor, size: 10),
-                            const SizedBox(width: 6),
-                            Text(
-                              normalizedStatus,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: isSmallScreen ? 12 : 16),
                   Row(
+                    mainAxisSize: MainAxisSize.max,
                     children: [
                       Expanded(
                         child: SizedBox(
-                          height: 46,
+                          height: isSmallScreen ? 44 : 46,
                           child: OutlinedButton(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'View Profile',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _mint,
-                              side: const BorderSide(color: _mint),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(26),
+                              side: const BorderSide(color: _mint, width: 1.5),
+                              padding: EdgeInsets.symmetric(
+                                vertical: isSmallScreen ? 11 : isMediumScreen ? 12 : 13,
+                                horizontal: isSmallScreen ? 16 : 20,
                               ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 24 : 28),
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -1467,35 +1980,41 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                 ),
                               );
                             },
-                            child: const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'View Profile',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: isSmallScreen ? 10 : 12),
                       Expanded(
                         child: SizedBox(
-                          height: 46,
+                          height: isSmallScreen ? 44 : 46,
                           child: ElevatedButton(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Book Now',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isUnavailable
                                   ? Colors.grey.shade400
                                   : _mint,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                                horizontal: 20,
+                              padding: EdgeInsets.symmetric(
+                                vertical: isSmallScreen ? 11 : isMediumScreen ? 12 : 13,
+                                horizontal: isSmallScreen ? 16 : 20,
                               ),
+                              elevation: isUnavailable ? 0 : 2,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(26),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 24 : 28),
                               ),
-                              minimumSize: const Size.fromHeight(46),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             onPressed: isUnavailable
                                 ? null
@@ -1515,28 +2034,45 @@ class _AppointmentPageState extends State<AppointmentPage> {
                                       ),
                                     );
                                   },
-                            child: const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                'Book Now',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontWeight: FontWeight.w700),
-                              ),
-                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                   if (isUnavailable)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Currently unavailable',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.red.shade200,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Colors.red.shade700,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Currently unavailable',
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1546,7 +2082,60 @@ class _AppointmentPageState extends State<AppointmentPage> {
           ],
         ),
       ),
+        ),
+      ),
     );
+  }
+
+  // Helper function to get specialty icon
+  IconData _getSpecialtyIcon(String specialty) {
+    // If no specialty is set, return question mark icon
+    if (specialty.isEmpty || specialty.toLowerCase() == 'specialty unavailable') {
+      return Icons.help_outline;
+    }
+    
+    final specialtyLower = specialty.toLowerCase();
+    if (specialtyLower.contains('behaviour') || specialtyLower.contains('behavior')) {
+      return Icons.psychology;
+    } else if (specialtyLower.contains('dermatology')) {
+      return Icons.medical_services;
+    } else if (specialtyLower.contains('pathology')) {
+      return Icons.science;
+    } else if (specialtyLower.contains('surgery')) {
+      return Icons.healing;
+    } else if (specialtyLower.contains('emergency')) {
+      return Icons.emergency;
+    }
+    return Icons.medical_information;
+  }
+
+  // Helper function to get specialty color
+  Color _getSpecialtyColor(String specialty) {
+    final specialtyLower = specialty.toLowerCase();
+    if (specialtyLower.contains('behaviour') || specialtyLower.contains('behavior')) {
+      return Colors.purple.shade700;
+    } else if (specialtyLower.contains('dermatology')) {
+      return Colors.blue.shade700;
+    } else if (specialtyLower.contains('pathology')) {
+      return Colors.red.shade700;
+    } else if (specialtyLower.contains('surgery')) {
+      return Colors.orange.shade700;
+    } else if (specialtyLower.contains('emergency')) {
+      return Colors.red.shade600;
+    }
+    return Colors.black87;
+  }
+
+  // Helper function to get filter icon
+  IconData _getFilterIcon(String filter) {
+    switch (filter) {
+      case 'Location':
+        return Icons.location_on;
+      case 'Specialty':
+        return Icons.medical_services;
+      default:
+        return Icons.filter_list;
+    }
   }
 }
 

@@ -46,39 +46,64 @@ class _CommunityPageState extends State<CommunityPage>
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar with back button only
+              // Top bar (copied style from AllPets header; adjusted title)
               Padding(
                 padding: EdgeInsets.only(
                   top: statusBarHeight + 4,
                   left: 8,
                   right: 8,
-                  bottom: 8,
                 ),
-                child: Row(
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 26,
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                        onPressed: () => Navigator.pop(context),
                       ),
-                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Center(
+                      child: Text(
+                        'Fur Community',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              // Tabs
+              // Tabs with custom styling
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: TabBar(
                   controller: _tabController,
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 2.5,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white70,
+                  indicator: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border(bottom: BorderSide(color: _mint, width: 3)),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelColor: _mint,
+                  unselectedLabelColor: Colors.white,
                   labelStyle: const TextStyle(
                     fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
                     fontSize: 14,
                   ),
                   tabs: const [
@@ -88,6 +113,7 @@ class _CommunityPageState extends State<CommunityPage>
                   ],
                 ),
               ),
+              const Divider(height: 1, thickness: 1, color: Colors.white),
 
               const SizedBox(height: 8),
 

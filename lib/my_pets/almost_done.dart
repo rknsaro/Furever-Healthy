@@ -46,6 +46,7 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
     text: 'Playful, Energetic and completely a sweetheart',
   );
   int? _isSpayedNeutered; // 0 for Yes, 1 for No
+  bool _isSaving = false;
   final List<String> _medicalConcerns = [
     'Skin Allergies',
     'Ear Infections',
@@ -410,15 +411,24 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
                           ),
                           const Spacer(),
                           GestureDetector(
-                            onTap: _saveAndNavigateToHome,
-                            child: Text(
-                              'Done',
-                              style: TextStyle(
-                                color: _mint,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            onTap: _isSaving ? null : _saveAndNavigateToHome,
+                            child: _isSaving
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(_mint),
+                                    ),
+                                  )
+                                : Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      color: _isSaving ? Colors.grey : _mint,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -445,12 +455,19 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
   }
 
   Future<void> _saveAndNavigateToHome() async {
+    if (_isSaving) return; // Prevent multiple calls
+    
+    setState(() => _isSaving = true);
+    
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to save pet data')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please log in to save pet data')),
+          );
+        }
+        setState(() => _isSaving = false);
         return;
       }
 
@@ -542,6 +559,10 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
       }
     }
   }

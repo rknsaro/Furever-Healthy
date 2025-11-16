@@ -29,9 +29,26 @@ class MyApp extends StatelessWidget {
       title: 'Furever Healthy',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        // Mobile-optimized theme settings
+        useMaterial3: true,
+        // Ensure touch targets meet mobile standards
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
+      // Mobile-first: prefer portrait orientation
+      builder: (context, child) {
+        return MediaQuery(
+          // Ensure text is readable on mobile devices
+          data: MediaQuery.of(context).copyWith(
+            textScaler: MediaQuery.of(context).textScaler.clamp(
+              minScaleFactor: 0.8,
+              maxScaleFactor: 1.2,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
   }
 }
