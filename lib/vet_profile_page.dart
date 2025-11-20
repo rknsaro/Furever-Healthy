@@ -5,6 +5,7 @@ import 'package:fureverhealthy/utils/vet_services_parser.dart';
 import 'package:flutter/foundation.dart';
 
 const _mint = Color(0xFF6F994A);
+const _mintDark = Color(0xFF112F15);
 const _mintLight = Color(0xFFE8F0D6); // Light mint background
 const _mintVeryLight = Color(0xFFF0F7E8); // Very light mint for subtle backgrounds
 
@@ -353,6 +354,9 @@ class _VetProfilePageState extends State<VetProfilePage> {
                     ),
                   ),
                 const SizedBox(height: 8),
+                // Portfolio section
+                _buildPortfolioSection(),
+                const SizedBox(height: 8),
                 // Recent reviews section
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -538,6 +542,716 @@ class _VetProfilePageState extends State<VetProfilePage> {
     );
   }
 
+  Widget _buildPortfolioSection() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('vets')
+          .doc(widget.vetId)
+          .snapshots(),
+      builder: (context, vetSnapshot) {
+        if (!vetSnapshot.hasData || !vetSnapshot.data!.exists) {
+          return const SizedBox.shrink();
+        }
+
+        final vetData = vetSnapshot.data!.data() as Map<String, dynamic>;
+        
+        // Get portfolio data - it's a Map with awards, bio, certifications
+        final portfolioRaw = vetData['portfolio'];
+        if (portfolioRaw == null || portfolioRaw is! Map) {
+          return const SizedBox.shrink();
+        }
+
+        final portfolio = portfolioRaw as Map<String, dynamic>;
+        
+        // Extract portfolio fields
+        final bio = portfolio['bio'] as String?;
+        final awardsRaw = portfolio['awards'];
+        final certificationsRaw = portfolio['certifications'];
+        final educationRaw = portfolio['education'];
+        final experienceRaw = portfolio['experience'];
+        final languagesRaw = portfolio['languages'];
+        final membershipsRaw = portfolio['memberships'];
+        final publicationsRaw = portfolio['publications'];
+        
+        // Safely extract awards
+        List<Map<String, dynamic>> awards = [];
+        if (awardsRaw is List) {
+          awards = awardsRaw.map((award) {
+            if (award is Map) {
+              return Map<String, dynamic>.from(award);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+        
+        // Safely extract certifications
+        List<Map<String, dynamic>> certifications = [];
+        if (certificationsRaw is List) {
+          certifications = certificationsRaw.map((cert) {
+            if (cert is Map) {
+              return Map<String, dynamic>.from(cert);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+        
+        // Safely extract education
+        List<Map<String, dynamic>> education = [];
+        if (educationRaw is List) {
+          education = educationRaw.map((edu) {
+            if (edu is Map) {
+              return Map<String, dynamic>.from(edu);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+        
+        // Safely extract experience
+        List<Map<String, dynamic>> experience = [];
+        if (experienceRaw is List) {
+          experience = experienceRaw.map((exp) {
+            if (exp is Map) {
+              return Map<String, dynamic>.from(exp);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+        
+        // Safely extract languages
+        List<String> languages = [];
+        if (languagesRaw is List) {
+          languages = languagesRaw.map((lang) {
+            if (lang is String) {
+              return lang;
+            }
+            return lang.toString();
+          }).toList();
+        }
+        
+        // Safely extract memberships
+        List<Map<String, dynamic>> memberships = [];
+        if (membershipsRaw is List) {
+          memberships = membershipsRaw.map((mem) {
+            if (mem is Map) {
+              return Map<String, dynamic>.from(mem);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+        
+        // Safely extract publications
+        List<Map<String, dynamic>> publications = [];
+        if (publicationsRaw is List) {
+          publications = publicationsRaw.map((pub) {
+            if (pub is Map) {
+              return Map<String, dynamic>.from(pub);
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+        
+        // Only show portfolio section if there's any data
+        if ((bio == null || bio.isEmpty) && 
+            awards.isEmpty && 
+            certifications.isEmpty &&
+            education.isEmpty &&
+            experience.isEmpty &&
+            languages.isEmpty &&
+            memberships.isEmpty &&
+            publications.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Bio Section
+              if (bio != null && bio.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('About'),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _mintVeryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    bio,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+              
+              // Awards Section
+              if (awards.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Awards'),
+                const SizedBox(height: 12),
+                ...awards.map((award) => _buildAwardCard(award)),
+                const SizedBox(height: 20),
+              ],
+              
+              // Certifications Section
+              if (certifications.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Certifications'),
+                const SizedBox(height: 12),
+                ...certifications.map((cert) => _buildCertificationCard(cert)),
+                const SizedBox(height: 20),
+              ],
+              
+              // Education Section
+              if (education.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Education'),
+                const SizedBox(height: 12),
+                ...education.map((edu) => _buildEducationCard(edu)),
+                const SizedBox(height: 20),
+              ],
+              
+              // Experience Section
+              if (experience.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Experience'),
+                const SizedBox(height: 12),
+                ...experience.map((exp) => _buildExperienceCard(exp)),
+                const SizedBox(height: 20),
+              ],
+              
+              // Memberships Section
+              if (memberships.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Memberships'),
+                const SizedBox(height: 12),
+                ...memberships.map((mem) => _buildMembershipCard(mem)),
+                const SizedBox(height: 20),
+              ],
+              
+              // Publications Section
+              if (publications.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Publications'),
+                const SizedBox(height: 12),
+                ...publications.map((pub) => _buildPublicationCard(pub)),
+                const SizedBox(height: 20),
+              ],
+              
+              // Languages Section (moved to bottom)
+              if (languages.isNotEmpty) ...[
+                _buildPortfolioSectionTitle('Languages'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: languages.map((lang) => _buildLanguageChip(lang)).toList(),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPortfolioSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: _mintDark,
+      ),
+    );
+  }
+
+  Widget _buildAwardCard(Map<String, dynamic> award) {
+    final title = award['title'] as String? ?? '';
+    final organization = award['organization'] as String? ?? '';
+    final year = award['year'] as String? ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _mintLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.emoji_events,
+              color: _mint,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title.isNotEmpty)
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                if (organization.isNotEmpty) ...[
+                  if (title.isNotEmpty) const SizedBox(height: 4),
+                  Text(
+                    organization,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (year.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    year,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCertificationCard(Map<String, dynamic> cert) {
+    final name = cert['name'] as String? ?? '';
+    final issuer = cert['issuer'] as String? ?? '';
+    final year = cert['year'] as String? ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _mintLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.verified,
+              color: _mint,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (name.isNotEmpty)
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                if (issuer.isNotEmpty) ...[
+                  if (name.isNotEmpty) const SizedBox(height: 4),
+                  Text(
+                    issuer,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (year.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    year,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEducationCard(Map<String, dynamic> edu) {
+    final degree = edu['degree'] as String? ?? '';
+    final institution = edu['institution'] as String? ?? '';
+    final year = edu['year'] as String? ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _mintLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.school,
+              color: _mint,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (degree.isNotEmpty)
+                  Text(
+                    degree,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                if (institution.isNotEmpty) ...[
+                  if (degree.isNotEmpty) const SizedBox(height: 4),
+                  Text(
+                    institution,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (year.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    year,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExperienceCard(Map<String, dynamic> exp) {
+    final position = exp['position'] as String? ?? '';
+    final organization = exp['organization'] as String? ?? '';
+    final years = exp['years'] as String? ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _mintLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.work,
+              color: _mint,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (position.isNotEmpty)
+                  Text(
+                    position,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                if (organization.isNotEmpty) ...[
+                  if (position.isNotEmpty) const SizedBox(height: 4),
+                  Text(
+                    organization,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (years.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    years,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageChip(String language) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: _mintLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _mint.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.language,
+            color: _mint,
+            size: 16,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            language,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _mintDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMembershipCard(Map<String, dynamic> mem) {
+    final role = mem['role'] as String? ?? '';
+    final organization = mem['organization'] as String? ?? '';
+    final year = mem['year'] as String? ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _mintLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.group,
+              color: _mint,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (role.isNotEmpty)
+                  Text(
+                    role,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                if (organization.isNotEmpty) ...[
+                  if (role.isNotEmpty) const SizedBox(height: 4),
+                  Text(
+                    organization,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (year.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    year,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPublicationCard(Map<String, dynamic> pub) {
+    final title = pub['title'] as String? ?? '';
+    final journal = pub['journal'] as String? ?? '';
+    final year = pub['year'] as String? ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _mintLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.article,
+              color: _mint,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title.isNotEmpty)
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                if (journal.isNotEmpty) ...[
+                  if (title.isNotEmpty) const SizedBox(height: 4),
+                  Text(
+                    journal,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+                if (year.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    year,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Fetch vet services with multiple fallback methods
   static Future<List<Map<String, dynamic>>> _fetchVetServicesWithFallback(String vetId) async {

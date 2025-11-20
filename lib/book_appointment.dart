@@ -67,6 +67,17 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Clear selected time if it becomes invalid (in the past)
+    if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            selectedTime = null;
+          });
+        }
+      });
+    }
+    
     return Scaffold(
       backgroundColor: _screenBg,
       appBar: AppBar(
@@ -318,6 +329,20 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
                       }
 
                       if (missingFields.isEmpty) {
+                        // Validate that the selected time is not in the past
+                        if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Cannot book appointments in the past. Please select a future time slot.',
+                              ),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                          return;
+                        }
+                        
                         // All fields are filled, proceed with booking
                         try {
                           await _saveAppointmentToFirestore();
@@ -473,11 +498,90 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
       initialDate: selectedDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 730)), // 2 years ahead
-      onDateChanged: (date) => setState(() => selectedDate = date),
+      onDateChanged: (date) {
+        setState(() {
+          selectedDate = date;
+          // Clear selected time if it becomes invalid (in the past) for the new date
+          if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
+            selectedTime = null;
+          }
+        });
+      },
     );
   }
 
+  // Check if a time slot is in the past (only for today's date)
+  bool _isTimeSlotInPast(String timeSlot) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    
+    // Only check for past times if the selected date is today
+    if (selectedDay.isAtSameMomentAs(today)) {
+      // Parse the start time from the time slot string (e.g., "8:00 - 9:00 AM" or "11:00 - 12:00 PM")
+      final timeParts = timeSlot.split(' ')[0].split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      
+      // Determine if the start time is AM or PM
+      // For "11:00 - 12:00 PM", the start time is 11:00 AM (not PM)
+      // Check if it's in the morning list (AM) or afternoon list (PM)
+      bool isAM;
+      if (morningTimes.contains(timeSlot)) {
+        // Morning slots: all are AM, even "11:00 - 12:00 PM" starts at 11:00 AM
+        isAM = true;
+      } else if (afternoonTimes.contains(timeSlot)) {
+        // Afternoon slots: all are PM
+        isAM = false;
+      } else {
+        // Fallback: check if string contains AM (for start time)
+        // If it contains both AM and PM, check the start hour
+        final hasAM = timeSlot.contains('AM');
+        final hasPM = timeSlot.contains('PM');
+        
+        if (hasAM && !hasPM) {
+          isAM = true;
+        } else if (hasPM && !hasAM) {
+          // If only PM, check if start hour is 12 (noon) or 1-11 (afternoon)
+          isAM = hour == 12; // 12:00 PM is noon, but 12:00 - 1:00 PM starts at noon
+        } else {
+          // Has both AM and PM (like "11:00 - 12:00 PM")
+          // The start time is AM if hour is 1-11, PM if hour is 12
+          isAM = hour != 12;
+        }
+      }
+      
+      int hour24 = hour;
+      if (!isAM && hour != 12) {
+        hour24 += 12;
+      } else if (isAM && hour == 12) {
+        hour24 = 0;
+      }
+      
+      // Create DateTime for the time slot start time
+      final slotDateTime = DateTime(now.year, now.month, now.day, hour24, minute);
+      
+      // Check if the time slot is in the past
+      return slotDateTime.isBefore(now);
+    }
+    
+    // For future dates, all time slots are available
+    return false;
+  }
+
+  // Get available time slots (filtered for today)
+  List<String> get availableMorningTimes {
+    return morningTimes.where((time) => !_isTimeSlotInPast(time)).toList();
+  }
+
+  List<String> get availableAfternoonTimes {
+    return afternoonTimes.where((time) => !_isTimeSlotInPast(time)).toList();
+  }
+
   Widget _buildTimeGrid() {
+    final morningSlots = availableMorningTimes;
+    final afternoonSlots = availableAfternoonTimes;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -487,42 +591,55 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 2.5,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
+        if (morningSlots.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'No morning slots available for today',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: morningSlots.length,
+            itemBuilder: (context, index) {
+              final time = morningSlots[index];
+              final bool selected = selectedTime == time;
+              return GestureDetector(
+                onTap: () => setState(() => selectedTime = time),
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? _mint : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? _mint : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    time,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-          itemCount: morningTimes.length,
-          itemBuilder: (context, index) {
-            final time = morningTimes[index];
-            final bool selected = selectedTime == time;
-            return GestureDetector(
-              onTap: () => setState(() => selectedTime = time),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? _mint : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: selected ? _mint : Colors.grey.shade300,
-                  ),
-                ),
-                child: Text(
-                  time,
-                  style: TextStyle(
-                    color: selected ? Colors.white : Colors.black87,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
         const SizedBox(height: 16),
 
         // Afternoon Section
@@ -531,42 +648,55 @@ class _BookAppointmentPageState extends State<BookAppointmentPage> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 2.5,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
+        if (afternoonSlots.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'No afternoon slots available for today',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: afternoonSlots.length,
+            itemBuilder: (context, index) {
+              final time = afternoonSlots[index];
+              final bool selected = selectedTime == time;
+              return GestureDetector(
+                onTap: () => setState(() => selectedTime = time),
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? _mint : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? _mint : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    time,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-          itemCount: afternoonTimes.length,
-          itemBuilder: (context, index) {
-            final time = afternoonTimes[index];
-            final bool selected = selectedTime == time;
-            return GestureDetector(
-              onTap: () => setState(() => selectedTime = time),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? _mint : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: selected ? _mint : Colors.grey.shade300,
-                  ),
-                ),
-                child: Text(
-                  time,
-                  style: TextStyle(
-                    color: selected ? Colors.white : Colors.black87,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
       ],
     );
   }

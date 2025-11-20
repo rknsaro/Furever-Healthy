@@ -12,6 +12,7 @@ import 'package:fureverhealthy/recent_notes.dart';
 import 'package:fureverhealthy/view_all_notes.dart';
 import 'package:fureverhealthy/quick_actions/medications.dart';
 // import 'package:fureverhealthy/my_pets/vaccine.dart';
+import 'package:fureverhealthy/pet_medical_history.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -1262,6 +1263,25 @@ class _ProfileTabState extends State<_ProfileTab> {
                   context,
                   MaterialPageRoute(builder: (_) => const MedicationsPage()),
                 );
+              },
+            ),
+            _buildCard(
+              title: 'Medical History',
+              iconPath: 'assets/pet_vaccines.png',
+              description: 'View and manage vaccine and medicine history for $_petName.',
+              buttonText: 'View history',
+              onPressed: () {
+                if (widget.selectedPetId != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PetMedicalHistoryPage(
+                        petId: widget.selectedPetId!,
+                        petName: _petName,
+                      ),
+                    ),
+                  );
+                }
               },
             ),
             // _buildCard(

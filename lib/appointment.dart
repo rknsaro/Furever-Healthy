@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fureverhealthy/book_appointment.dart';
 import 'package:fureverhealthy/vet_profile_page.dart';
@@ -21,138 +22,166 @@ class _AppointmentPageState extends State<AppointmentPage> {
   String? selectedFilterType;
   String? selectedFilterValue;
   bool _showAppointments = false; // Toggle between vets and appointments
+  StreamSubscription<QuerySnapshot>? _vetsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadVets();
+    _setupVetsListener();
   }
 
-  // Load vets from Firestore
-  Future<void> _loadVets() async {
-    try {
-      // Try 'vets' collection first, then 'veterinarians', then 'users' with role='vet'
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('vets')
-          .get();
+  @override
+  void dispose() {
+    _vetsSubscription?.cancel();
+    super.dispose();
+  }
 
-      // If no results, try 'veterinarians' collection
-      if (snapshot.docs.isEmpty) {
-        snapshot = await FirebaseFirestore.instance
-            .collection('veterinarians')
-            .get();
-      }
+  // Setup real-time listener for vets from Firestore
+  void _setupVetsListener() {
+    // Cancel existing subscription if any
+    _vetsSubscription?.cancel();
 
-      // If still no results, try 'users' with role='vet'
-      if (snapshot.docs.isEmpty) {
-        snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .where('role', isEqualTo: 'vet')
-            .get();
-      }
+    // Try collections in order: 'vets', 'veterinarians', 'users' with role='vet', 'users' with userType='vet'
+    _tryCollection('vets');
+  }
 
-      if (snapshot.docs.isEmpty) {
-        snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .where('userType', isEqualTo: 'vet')
-            .get();
-      }
+  void _tryCollection(String collectionName, {String? whereField, String? whereValue}) {
+    _vetsSubscription?.cancel();
+    
+    Query query;
+    if (whereField != null && whereValue != null) {
+      query = FirebaseFirestore.instance
+          .collection(collectionName)
+          .where(whereField, isEqualTo: whereValue);
+    } else {
+      query = FirebaseFirestore.instance.collection(collectionName);
+    }
 
-      if (mounted) {
-        final vets = <Map<String, dynamic>>[];
-        final locations = <String>{};
-        final specialties = <String>{};
-
-        for (var doc in snapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final String status =
-              (data['status'] as String?) ??
-              (data['availability'] as String?) ??
-              (data['availabilityStatus'] as String?) ??
-              ((data['isAvailable'] is bool)
-                  ? ((data['isAvailable'] as bool)
-                        ? 'Available'
-                        : 'Unavailable')
-                  : null) ??
-              'Available';
-
-          // Check for premium status (support multiple field names)
-          final premiumBool = data['premium'] as bool?;
-          final isPremiumBool = data['isPremium'] as bool?;
-          final isPremiumVetBool = data['isPremiumVet'] as bool?;
-          final premiumVetBool = data['premiumVet'] as bool?;
-          final premiumString = data['premium'] as String?;
-          
-          bool isPremium = false;
-          if (premiumBool != null) {
-            isPremium = premiumBool;
-          } else if (isPremiumBool != null) {
-            isPremium = isPremiumBool;
-          } else if (isPremiumVetBool != null) {
-            isPremium = isPremiumVetBool;
-          } else if (premiumVetBool != null) {
-            isPremium = premiumVetBool;
-          } else if (premiumString != null) {
-            isPremium = premiumString.toLowerCase() == 'true';
-          }
-
-          final vet = {
-            'vetId': doc.id, // Store the document ID as vetId
-            'name': data['name'] ?? data['displayName'] ?? 'Unknown Vet',
-            'specialty': data['specialization'] ?? 
-                         data['specialty'] ?? 'Specialty Unavailable',
-            'profileImageUrl': data['profileImageUrl'] as String?,
-            'rating': data['rating'] is int
-                ? data['rating']
-                : (data['rating'] is double
-                      ? (data['rating'] as double).round()
-                      : 5),
-            'location': data['location'] ?? 'Unknown',
-            'verified': data['verified'] ?? true,
-            'status': status,
-            'isPremium': isPremium,
-          };
-          vets.add(vet);
-
-          // Collect unique locations and specialties for filters
-          if (vet['location'] != null && vet['location'] != 'Unknown') {
-            locations.add(vet['location'] as String);
-          }
-          // Only add specialty to filter list if it's not the default "Specialty Unavailable"
-          if (vet['specialty'] != null && 
-              vet['specialty'] != 'Specialty Unavailable' &&
-              (vet['specialty'] as String).isNotEmpty) {
-            specialties.add(vet['specialty'] as String);
+    _vetsSubscription = query.snapshots().listen(
+      (QuerySnapshot snapshot) {
+        // If this collection has data, use it; otherwise try next collection
+        if (snapshot.docs.isNotEmpty) {
+          _processVetsSnapshot(snapshot);
+        } else {
+          // Try next collection in fallback order
+          if (collectionName == 'vets') {
+            _tryCollection('veterinarians');
+          } else if (collectionName == 'veterinarians') {
+            _tryCollection('users', whereField: 'role', whereValue: 'vet');
+          } else if (collectionName == 'users' && whereField == 'role') {
+            _tryCollection('users', whereField: 'userType', whereValue: 'vet');
+          } else {
+            // All collections tried, process empty result
+            _processVetsSnapshot(snapshot);
           }
         }
+      },
+      onError: (error) {
+        print('Error listening to $collectionName: $error');
+        // Try next collection on error
+        if (collectionName == 'vets') {
+          _tryCollection('veterinarians');
+        } else if (collectionName == 'veterinarians') {
+          _tryCollection('users', whereField: 'role', whereValue: 'vet');
+        } else if (collectionName == 'users' && whereField == 'role') {
+          _tryCollection('users', whereField: 'userType', whereValue: 'vet');
+        }
+      },
+    );
+  }
 
-        // Sort vets: premium vets first, then by rating (descending)
-        vets.sort((a, b) {
-          final aPremium = a['isPremium'] as bool? ?? false;
-          final bPremium = b['isPremium'] as bool? ?? false;
-          
-          // Premium vets come first
-          if (aPremium && !bPremium) return -1;
-          if (!aPremium && bPremium) return 1;
-          
-          // If both are premium or both are not, sort by rating (descending)
-          final aRating = a['rating'] as int? ?? 0;
-          final bRating = b['rating'] as int? ?? 0;
-          return bRating.compareTo(aRating);
-        });
+  void _processVetsSnapshot(QuerySnapshot snapshot) {
+    if (!mounted) return;
 
-        setState(() {
-          allVets = vets;
-          allLocations = locations.toList()..sort();
-          // Don't update Location and Specialty - they are fixed
-          // filterOptions['Location'] = locations.toList()..sort();
-          // filterOptions['Specialty'] = specialties.toList()..sort();
-        });
+    final vets = <Map<String, dynamic>>[];
+    final locations = <String>{};
+    final specialties = <String>{};
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final String status =
+          (data['status'] as String?) ??
+          (data['availability'] as String?) ??
+          (data['availabilityStatus'] as String?) ??
+          ((data['isAvailable'] is bool)
+              ? ((data['isAvailable'] as bool)
+                    ? 'Available'
+                    : 'Unavailable')
+              : null) ??
+          'Available';
+
+      // Check for premium status (support multiple field names)
+      final premiumBool = data['premium'] as bool?;
+      final isPremiumBool = data['isPremium'] as bool?;
+      final isPremiumVetBool = data['isPremiumVet'] as bool?;
+      final premiumVetBool = data['premiumVet'] as bool?;
+      final premiumString = data['premium'] as String?;
+      
+      bool isPremium = false;
+      if (premiumBool != null) {
+        isPremium = premiumBool;
+      } else if (isPremiumBool != null) {
+        isPremium = isPremiumBool;
+      } else if (isPremiumVetBool != null) {
+        isPremium = isPremiumVetBool;
+      } else if (premiumVetBool != null) {
+        isPremium = premiumVetBool;
+      } else if (premiumString != null) {
+        isPremium = premiumString.toLowerCase() == 'true';
       }
-    } catch (e) {
-      print('Error loading vets: $e');
-      // Keep empty list if there's an error
+
+      final vet = {
+        'vetId': doc.id, // Store the document ID as vetId
+        'name': data['name'] ?? data['displayName'] ?? 'Unknown Vet',
+        'specialty': data['specialization'] ?? 
+                     data['specialty'] ?? 'Specialty Unavailable',
+        'profileImageUrl': data['profileImageUrl'] as String?,
+        'rating': data['rating'] is int
+            ? data['rating']
+            : (data['rating'] is double
+                  ? (data['rating'] as double).round()
+                  : 5),
+        'location': data['location'] ?? 'Unknown',
+        'verified': data['verified'] ?? true,
+        'status': status,
+        'isPremium': isPremium,
+      };
+      vets.add(vet);
+
+      // Collect unique locations and specialties for filters
+      if (vet['location'] != null && vet['location'] != 'Unknown') {
+        locations.add(vet['location'] as String);
+      }
+      // Only add specialty to filter list if it's not the default "Specialty Unavailable"
+      if (vet['specialty'] != null && 
+          vet['specialty'] != 'Specialty Unavailable' &&
+          (vet['specialty'] as String).isNotEmpty) {
+        specialties.add(vet['specialty'] as String);
+      }
     }
+
+    // Sort vets: premium vets first, then by rating (descending)
+    vets.sort((a, b) {
+      final aPremium = a['isPremium'] as bool? ?? false;
+      final bPremium = b['isPremium'] as bool? ?? false;
+      
+      // Premium vets come first
+      if (aPremium && !bPremium) return -1;
+      if (!aPremium && bPremium) return 1;
+      
+      // If both are premium or both are not, sort by rating (descending)
+      final aRating = a['rating'] as int? ?? 0;
+      final bRating = b['rating'] as int? ?? 0;
+      return bRating.compareTo(aRating);
+    });
+
+    setState(() {
+      allVets = vets;
+      allLocations = locations.toList()..sort();
+      // Don't update Location and Specialty - they are fixed
+      // filterOptions['Location'] = locations.toList()..sort();
+      // filterOptions['Specialty'] = specialties.toList()..sort();
+    });
   }
 
   List<Map<String, dynamic>> get filteredVets {
@@ -898,24 +927,59 @@ class _AppointmentPageState extends State<AppointmentPage> {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: statusColor),
-                ),
-                child: Text(
-                  displayStatus,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: statusColor),
+                    ),
+                    child: Text(
+                      displayStatus,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
-                ),
+                  // Show reschedule indicator
+                  if (appointment['isRescheduled'] == true) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.update, color: Colors.orange, size: 12),
+                          SizedBox(width: 4),
+                          Text(
+                            'Rescheduled',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -998,6 +1062,48 @@ class _AppointmentPageState extends State<AppointmentPage> {
           ),
           const SizedBox(height: 12),
 
+          // Show original appointment info if rescheduled
+          if (appointment['isRescheduled'] == true && appointment['originalDate'] != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.history, color: Colors.orange, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Original Appointment',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Date: ${DateFormat('MMM d, yyyy').format((appointment['originalDate'] as Timestamp).toDate())}',
+                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  ),
+                  if (appointment['originalTimeSlot'] != null)
+                    Text(
+                      'Time: ${appointment['originalTimeSlot']}',
+                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // Cost
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1032,7 +1138,50 @@ class _AppointmentPageState extends State<AppointmentPage> {
             const Divider(height: 24),
             _buildFeedbackSection(appointmentId, appointment),
           ],
+
+          // Reschedule button for confirmed and pending appointments
+          if (normalizedStatus == 'confirmed' || normalizedStatus == 'pending') ...[
+            const Divider(height: 24),
+            _buildRescheduleSection(appointment, appointmentId),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildRescheduleSection(Map<String, dynamic> appointment, String appointmentId) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _navigateToReschedule(appointment, appointmentId),
+        icon: const Icon(Icons.calendar_today, color: _mint),
+        label: const Text(
+          'Reschedule Appointment',
+          style: TextStyle(
+            color: _mint,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: _mint, width: 2),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToReschedule(Map<String, dynamic> appointment, String appointmentId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RescheduleAppointmentPage(
+          appointmentId: appointmentId,
+          appointment: appointment,
+        ),
       ),
     );
   }
@@ -2361,5 +2510,538 @@ class _FeedbackFormState extends State<_FeedbackForm> {
         ],
       ),
     );
+  }
+}
+
+// Reschedule Appointment Page
+class RescheduleAppointmentPage extends StatefulWidget {
+  final String appointmentId;
+  final Map<String, dynamic> appointment;
+
+  const RescheduleAppointmentPage({
+    super.key,
+    required this.appointmentId,
+    required this.appointment,
+  });
+
+  @override
+  State<RescheduleAppointmentPage> createState() => _RescheduleAppointmentPageState();
+}
+
+class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
+  DateTime selectedDate = DateTime.now();
+  String? selectedTime;
+  
+  List<String> morningTimes = [
+    '8:00 - 9:00 AM',
+    '9:00 - 10:00 AM',
+    '10:00 - 11:00 AM',
+    '11:00 - 12:00 PM',
+  ];
+  List<String> afternoonTimes = [
+    '1:00 - 2:00 PM',
+    '2:00 - 3:00 PM',
+    '3:00 - 4:00 PM',
+    '4:00 - 5:00 PM',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with current appointment date if it's in the future
+    final currentAppointmentDate = 
+        (widget.appointment['appointmentDateTime'] as Timestamp?)?.toDate() ??
+        (widget.appointment['date'] as Timestamp?)?.toDate() ??
+        DateTime.now();
+    
+    if (currentAppointmentDate.isAfter(DateTime.now())) {
+      selectedDate = currentAppointmentDate;
+    }
+    
+    // Initialize with current time slot
+    selectedTime = widget.appointment['timeSlot'] as String?;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Clear selected time if it becomes invalid (in the past)
+    if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            selectedTime = null;
+          });
+        }
+      });
+    }
+
+    return Scaffold(
+      backgroundColor: _screenBg,
+      appBar: AppBar(
+        backgroundColor: _mint,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Reschedule Appointment',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Info card showing current appointment details
+              _buildCurrentAppointmentCard(),
+              const SizedBox(height: 24),
+
+              // Select Date
+              const Text(
+                'Select New Date',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              _calendar(),
+              const SizedBox(height: 20),
+
+              // Appointment Time
+              const Text(
+                'Appointment time',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              _buildTimeGrid(),
+              const SizedBox(height: 20),
+
+              // Action Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (selectedTime == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please select an appointment time.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      // Validate that the selected time is not in the past
+                      if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Cannot reschedule appointments in the past. Please select a future time slot.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      try {
+                        await _rescheduleAppointment();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Appointment rescheduled! Waiting for vet confirmation.',
+                              ),
+                              backgroundColor: _mint,
+                            ),
+                          );
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error rescheduling appointment: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _mint,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 14,
+                      ),
+                    ),
+                    child: const Text(
+                      'Confirm Reschedule',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentAppointmentCard() {
+    final currentDate = 
+        (widget.appointment['appointmentDateTime'] as Timestamp?)?.toDate() ??
+        (widget.appointment['date'] as Timestamp?)?.toDate() ??
+        DateTime.now();
+    final currentTime = widget.appointment['timeSlot'] ?? '';
+    final petName = widget.appointment['petName'] ?? 'Unknown';
+    final vetName = widget.appointment['vetName'] ?? 'Unknown Vet';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Current Appointment',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('Pet: $petName', style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 4),
+          Text('Vet: $vetName', style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 4),
+          Text(
+            'Date: ${DateFormat('MMM d, yyyy').format(currentDate)}',
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text('Time: $currentTime', style: const TextStyle(fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _calendar() {
+    return CalendarDatePicker(
+      initialDate: selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 730)), // 2 years ahead
+      onDateChanged: (date) {
+        setState(() {
+          selectedDate = date;
+          // Clear selected time if it becomes invalid (in the past) for the new date
+          if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
+            selectedTime = null;
+          }
+        });
+      },
+    );
+  }
+
+  bool _isTimeSlotInPast(String timeSlot) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    
+    // Only check for past times if the selected date is today
+    if (selectedDay.isAtSameMomentAs(today)) {
+      final timeParts = timeSlot.split(' ')[0].split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      
+      bool isAM;
+      if (morningTimes.contains(timeSlot)) {
+        isAM = true;
+      } else if (afternoonTimes.contains(timeSlot)) {
+        isAM = false;
+      } else {
+        final hasAM = timeSlot.contains('AM');
+        final hasPM = timeSlot.contains('PM');
+        
+        if (hasAM && !hasPM) {
+          isAM = true;
+        } else if (hasPM && !hasAM) {
+          isAM = hour == 12;
+        } else {
+          isAM = hour != 12;
+        }
+      }
+      
+      int hour24 = hour;
+      if (!isAM && hour != 12) {
+        hour24 += 12;
+      } else if (isAM && hour == 12) {
+        hour24 = 0;
+      }
+      
+      final slotDateTime = DateTime(now.year, now.month, now.day, hour24, minute);
+      return slotDateTime.isBefore(now);
+    }
+    
+    return false;
+  }
+
+  List<String> get availableMorningTimes {
+    return morningTimes.where((time) => !_isTimeSlotInPast(time)).toList();
+  }
+
+  List<String> get availableAfternoonTimes {
+    return afternoonTimes.where((time) => !_isTimeSlotInPast(time)).toList();
+  }
+
+  Widget _buildTimeGrid() {
+    final morningSlots = availableMorningTimes;
+    final afternoonSlots = availableAfternoonTimes;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Morning Section
+        const Text(
+          'Morning',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        if (morningSlots.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'No morning slots available for today',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: morningSlots.length,
+            itemBuilder: (context, index) {
+              final time = morningSlots[index];
+              final bool selected = selectedTime == time;
+              return GestureDetector(
+                onTap: () => setState(() => selectedTime = time),
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? _mint : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? _mint : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    time,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        const SizedBox(height: 16),
+
+        // Afternoon Section
+        const Text(
+          'Afternoon',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        if (afternoonSlots.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'No afternoon slots available for today',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            itemCount: afternoonSlots.length,
+            itemBuilder: (context, index) {
+              final time = afternoonSlots[index];
+              final bool selected = selectedTime == time;
+              return GestureDetector(
+                onTap: () => setState(() => selectedTime = time),
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? _mint : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? _mint : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    time,
+                    style: TextStyle(
+                      color: selected ? Colors.white : Colors.black87,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  int _parseHourFromTime(String time) {
+    final parts = time.split(' ')[0].split(':');
+    int hour = int.parse(parts[0]);
+    final isPM = time.contains('PM');
+    if (isPM && hour != 12) {
+      hour += 12;
+    } else if (!isPM && hour == 12) {
+      hour = 0;
+    }
+    return hour;
+  }
+
+  int _parseMinuteFromTime(String time) {
+    final parts = time.split(' ')[0].split(':');
+    return int.parse(parts[1]);
+  }
+
+  Future<void> _rescheduleAppointment() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User not logged in');
+    }
+
+    // Get original appointment details
+    final originalDate = 
+        (widget.appointment['appointmentDateTime'] as Timestamp?)?.toDate() ??
+        (widget.appointment['date'] as Timestamp?)?.toDate() ??
+        DateTime.now();
+    final originalTimeSlot = widget.appointment['timeSlot'] ?? '';
+
+    // Combine date and time for new appointment datetime
+    final newAppointmentDateTime = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      _parseHourFromTime(selectedTime!),
+      _parseMinuteFromTime(selectedTime!),
+    );
+
+    // Update appointment document
+    await FirebaseFirestore.instance
+        .collection('user_appointments')
+        .doc(widget.appointmentId)
+        .update({
+      'date': Timestamp.fromDate(selectedDate),
+      'timeSlot': selectedTime,
+      'appointmentDateTime': Timestamp.fromDate(newAppointmentDateTime),
+      'status': 'pending', // Reset to pending for vet approval
+      'isRescheduled': true,
+      'originalDate': Timestamp.fromDate(originalDate),
+      'originalTimeSlot': originalTimeSlot,
+      'rescheduledAt': Timestamp.now(),
+      'rescheduledBy': user.uid,
+    });
+
+    // Update notification
+    await _createOrUpdateNotificationForReschedule();
+  }
+
+  Future<void> _createOrUpdateNotificationForReschedule() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final notificationsRef = FirebaseFirestore.instance
+        .collection('notifications')
+        .doc(widget.appointmentId);
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((txn) async {
+        final appointmentDoc = await txn.get(
+          FirebaseFirestore.instance
+              .collection('user_appointments')
+              .doc(widget.appointmentId)
+        );
+        
+        if (!appointmentDoc.exists) return;
+
+        final appointmentData = appointmentDoc.data()!;
+        final payload = <String, dynamic>{
+          'userId': user.uid,
+          'appointmentId': widget.appointmentId,
+          'status': 'pending',
+          'vetName': appointmentData['vetName'],
+          'petName': appointmentData['petName'],
+          'date': appointmentData['date'],
+          'timeSlot': appointmentData['timeSlot'],
+          'appointmentDateTime': appointmentData['appointmentDateTime'],
+          'isRescheduled': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+        };
+
+        txn.set(notificationsRef, payload, SetOptions(merge: true));
+      });
+    } catch (e) {
+      debugPrint('Failed to sync notification for reschedule: $e');
+    }
   }
 }
