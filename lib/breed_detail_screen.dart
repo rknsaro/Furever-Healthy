@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'gemini_service.dart';
 
 const _mint = Color(0xFF6F994A);
 const _screenBg = Color(0xFFF6F8FB);
@@ -32,6 +34,16 @@ class BreedDetailScreen extends StatefulWidget {
 
 class _BreedDetailScreenState extends State<BreedDetailScreen> {
   String _activeCareGuideTab = 'Nutrition';
+  bool _isLoadingInfo = false;
+  bool _hasFetchedInfo = false;
+
+  // Mutable state for breed information
+  late String _breedGroup;
+  late String _size;
+  late String _lifeSpan;
+  late String _description;
+  late Map<String, int> _characteristics;
+  late Map<String, dynamic> _careGuide;
 
   // Top 3 breeds for detailed content
   static const List<String> _top3Dogs = [
@@ -47,6 +59,169 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
     'persian cats',
     'persian',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with widget values
+    _breedGroup = widget.breedGroup;
+    _size = widget.size;
+    _lifeSpan = widget.lifeSpan;
+    _description = widget.description;
+    _characteristics = Map<String, int>.from(widget.characteristics);
+    _careGuide = Map<String, dynamic>.from(widget.careGuide);
+
+    // Check if breed is mixed and update accordingly
+    _checkIfMixedBreed();
+
+    // Check if information is missing and fetch it
+    _checkAndFetchMissingInfo();
+  }
+
+  void _checkIfMixedBreed() {
+    final breedLower = widget.breed.toLowerCase();
+    final isMixedBreed =
+        breedLower.contains('mixed') ||
+        breedLower.contains('mix') ||
+        breedLower.contains('mutt') ||
+        breedLower == 'aspin' ||
+        breedLower == 'puspin' ||
+        breedLower.contains('domestic shorthair') ||
+        breedLower.contains('domestic longhair');
+
+    if (isMixedBreed) {
+      // Set "Mixed" for breed group if it's Unknown
+      if (_breedGroup == 'Unknown' || _breedGroup.isEmpty) {
+        _breedGroup = 'Mixed';
+      }
+      // For size and lifespan, keep existing values or set reasonable defaults
+      if (_size == 'Unknown' || _size.isEmpty) {
+        _size = 'Varies';
+      }
+      if (_lifeSpan == 'Unknown' || _lifeSpan.isEmpty) {
+        _lifeSpan = 'Varies';
+      }
+    }
+  }
+
+  bool _isInfoMissing() {
+    // Don't treat "Mixed" or "Varies" as missing information
+    final breedGroupMissing =
+        (_breedGroup == 'Unknown' || _breedGroup.isEmpty) &&
+        _breedGroup != 'Mixed';
+    final sizeMissing =
+        (_size == 'Unknown' || _size.isEmpty) && _size != 'Varies';
+    final lifeSpanMissing =
+        (_lifeSpan == 'Unknown' || _lifeSpan.isEmpty) && _lifeSpan != 'Varies';
+
+    return breedGroupMissing ||
+        sizeMissing ||
+        lifeSpanMissing ||
+        _description.isEmpty ||
+        _characteristics.isEmpty ||
+        _careGuide.isEmpty;
+  }
+
+  Future<void> _checkAndFetchMissingInfo() async {
+    if (_hasFetchedInfo || !_isInfoMissing()) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingInfo = true;
+    });
+
+    try {
+      final breedInfoJson = await GeminiService.getBreedInformation(
+        widget.breed,
+      );
+      final breedData = jsonDecode(breedInfoJson) as Map<String, dynamic>;
+
+      setState(() {
+        String? newBreedGroup =
+            breedData['breed_group']?.toString() ??
+            breedData['breedGroup']?.toString();
+
+        // If breed is mixed, ensure breed_group is "Mixed"
+        final breedLower = widget.breed.toLowerCase();
+        final isMixedBreed =
+            breedLower.contains('mixed') ||
+            breedLower.contains('mix') ||
+            breedLower.contains('mutt') ||
+            breedLower == 'aspin' ||
+            breedLower == 'puspin' ||
+            breedLower.contains('domestic shorthair') ||
+            breedLower.contains('domestic longhair');
+
+        if (isMixedBreed &&
+            (newBreedGroup == null || newBreedGroup == 'Unknown')) {
+          newBreedGroup = 'Mixed';
+        }
+
+        _breedGroup = newBreedGroup ?? _breedGroup;
+
+        String? newSize = breedData['size']?.toString();
+        if (isMixedBreed && (newSize == null || newSize == 'Unknown')) {
+          newSize = 'Varies';
+        }
+        _size = newSize ?? _size;
+
+        String? newLifeSpan =
+            breedData['life_span']?.toString() ??
+            breedData['lifeSpan']?.toString();
+        if (isMixedBreed && (newLifeSpan == null || newLifeSpan == 'Unknown')) {
+          newLifeSpan = 'Varies';
+        }
+        _lifeSpan = newLifeSpan ?? _lifeSpan;
+
+        _description = breedData['description']?.toString() ?? _description;
+
+        // Update characteristics
+        final characteristicsData = breedData['characteristics'];
+        if (characteristicsData != null) {
+          final Map<String, dynamic> charMap = characteristicsData is Map
+              ? Map<String, dynamic>.from(characteristicsData)
+              : {};
+          _characteristics = charMap.map(
+            (key, value) => MapEntry(
+              key.toString(),
+              (value is num)
+                  ? value.round()
+                  : int.tryParse(value.toString()) ?? 0,
+            ),
+          );
+        }
+
+        // Update care guide
+        final careGuideData = breedData['care_guide'] ?? breedData['careGuide'];
+        if (careGuideData != null) {
+          final Map<String, dynamic> guideMap = careGuideData is Map
+              ? Map<String, dynamic>.from(careGuideData)
+              : {};
+          _careGuide = guideMap.map(
+            (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+          );
+        }
+
+        _hasFetchedInfo = true;
+        _isLoadingInfo = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingInfo = false;
+      });
+      // Silently fail - user will see the original data
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not fetch breed information: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
 
   bool get _isTop3Breed {
     final breedLower = widget.breed.toLowerCase().trim();
@@ -360,19 +535,22 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
       switch (tabName) {
         case 'Nutrition':
           content =
-              widget.careGuide['nutrition'] ?? 'No information available.';
+              _careGuide['nutrition']?.toString() ??
+              'No information available.';
           break;
         case 'Grooming':
-          content = widget.careGuide['grooming'] ?? 'No information available.';
+          content =
+              _careGuide['grooming']?.toString() ?? 'No information available.';
           break;
         case 'Training':
           content =
-              widget.careGuide['exercise'] ??
-              widget.careGuide['training'] ??
+              _careGuide['exercise']?.toString() ??
+              _careGuide['training']?.toString() ??
               'No information available.';
           break;
         case 'Health':
-          content = widget.careGuide['health'] ?? 'No information available.';
+          content =
+              _careGuide['health']?.toString() ?? 'No information available.';
           break;
       }
       return content;
@@ -382,7 +560,7 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
     final detailedGuide = _getDetailedCareGuide();
     final content =
         detailedGuide[tabName.toLowerCase()] ??
-        widget.careGuide[tabName.toLowerCase()] ??
+        _careGuide[tabName.toLowerCase()]?.toString() ??
         'No information available.';
 
     return content;
@@ -530,20 +708,35 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
               ],
             ),
 
+            // Loading indicator if fetching info
+            if (_isLoadingInfo)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(color: _mint),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Fetching breed information...',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Breed Info Row
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  _BreedInfoColumn(
-                    title: 'Breed Group',
-                    value: widget.breedGroup,
-                  ),
+                  _BreedInfoColumn(title: 'Breed Group', value: _breedGroup),
                   const SizedBox(width: 24),
-                  _BreedInfoColumn(title: 'Size', value: widget.size),
+                  _BreedInfoColumn(title: 'Size', value: _size),
                   const SizedBox(width: 24),
-                  _BreedInfoColumn(title: 'Life Span', value: widget.lifeSpan),
+                  _BreedInfoColumn(title: 'Life Span', value: _lifeSpan),
                 ],
               ),
             ),
@@ -552,7 +745,9 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                widget.description,
+                _description.isNotEmpty
+                    ? _description
+                    : 'No description available.',
                 style: const TextStyle(fontSize: 15, color: Colors.black87),
               ),
             ),
@@ -569,9 +764,25 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  ...widget.characteristics.entries.map(
-                    (entry) => _buildCharacteristicRow(entry.key, entry.value),
-                  ),
+                  if (_characteristics.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        _isLoadingInfo
+                            ? 'Loading characteristics...'
+                            : 'No characteristics available.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    )
+                  else
+                    ..._characteristics.entries.map(
+                      (entry) =>
+                          _buildCharacteristicRow(entry.key, entry.value),
+                    ),
                 ],
               ),
             ),

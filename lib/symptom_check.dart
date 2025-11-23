@@ -284,7 +284,7 @@ class _SymptomCheckPageState extends State<SymptomCheckPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Hi! What\'s concerning you today?',
+                              'Hi! What\'s concerning you about your pet today?',
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,

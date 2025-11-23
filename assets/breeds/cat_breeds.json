@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Siamese",
+    "synonyms": ["siamese"],
+    "animalType": "Cat",
+    "breedGroup": "Shorthair",
+    "size": "Medium",
+    "lifeSpan": "12-20 years",
+    "description": "Siamese cats are vocal, social, and intelligent. They form strong bonds with their people and enjoy interactive play and attention.",
+    "characteristics": {
+      "Friendliness": 90,
+      "Trainability": 80,
+      "Energy Level": 85,
+      "Shedding": 40
+    },
+    "careGuide": {
+      "nutrition": "Provide high-protein diets with wet food for hydration. Portion control to prevent weight gain.",
+      "grooming": "Minimal grooming—weekly brushing is typically enough. Regular dental care recommended.",
+      "exercise": "Daily interactive play sessions with wand toys and puzzle feeders to satisfy high energy.",
+      "health": "Watch for dental disease and respiratory issues in some lines. Maintain routine veterinary care."
+    }
+  },
+  {
+    "name": "Maine Coon",
+    "synonyms": ["maine coon"],
+    "animalType": "Cat",
+    "breedGroup": "Longhair",
+    "size": "Large",
+    "lifeSpan": "12-15 years",
+    "description": "Maine Coons are large, gentle cats known for their friendly nature and tufted ears. They are playful and adapt well to families.",
+    "characteristics": {
+      "Friendliness": 90,
+      "Trainability": 75,
+      "Energy Level": 70,
+      "Shedding": 85
+    },
+    "careGuide": {
+      "nutrition": "High-quality diet with adequate protein. Portion meals to maintain healthy weight in large breeds.",
+      "grooming": "Brush several times a week to prevent mats in the long coat. Regular dental and ear care.",
+      "exercise": "Provide climbing structures, interactive play, and puzzle toys to keep them engaged.",
+      "health": "Monitor for HCM (heart disease) and hip dysplasia. Schedule regular vet screenings."
+    }
+  }
+]
+

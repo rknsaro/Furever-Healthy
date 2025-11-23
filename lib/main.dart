@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Add this line
 import 'firebase_options.dart';
 import 'auth_wrapper.dart'; // Your wrapper for login logic
+import 'package:fureverhealthy/services/notification_service.dart';
 
 // Updated by HFCapistrano - Firebase integration complete
 
@@ -13,9 +14,10 @@ Future<void> main() async {
   await dotenv.load(fileName: "assets/.env");
 
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Initialize notification service
+  await NotificationService().initialize();
 
   runApp(const MyApp());
 }
@@ -41,10 +43,9 @@ class MyApp extends StatelessWidget {
         return MediaQuery(
           // Ensure text is readable on mobile devices
           data: MediaQuery.of(context).copyWith(
-            textScaler: MediaQuery.of(context).textScaler.clamp(
-              minScaleFactor: 0.8,
-              maxScaleFactor: 1.2,
-            ),
+            textScaler: MediaQuery.of(
+              context,
+            ).textScaler.clamp(minScaleFactor: 0.8, maxScaleFactor: 1.2),
           ),
           child: child!,
         );

@@ -3,9 +3,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fureverhealthy/utils/reminder_service.dart';
 
 const _mint = Color(0xFF6F994A);
 const _screenBg = Color(0xFFF6F8FB);
+
+/// Opens the add note screen.
+/// Returns true if a note was created or updated, otherwise null/false.
+Future<bool?> addNewNote(BuildContext context, {String? initialPetName}) {
+  return Navigator.push<bool>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => RecentNotesPage(initialPetName: initialPetName),
+    ),
+  );
+}
 
 class RecentNotesPage extends StatefulWidget {
   final String? initialPetName;
@@ -338,7 +350,39 @@ class _RecentNotesPageState extends State<RecentNotesPage> {
         }
       } else {
         // Create new note
-        await FirebaseFirestore.instance.collection('petNotes').add(noteData);
+        final docRef = await FirebaseFirestore.instance
+            .collection('petNotes')
+            .add(noteData);
+
+        // Get petId from petName
+        String? petId;
+        if (_selectedPet != null && _selectedPet!.isNotEmpty) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            final petSnapshot = await FirebaseFirestore.instance
+                .collection('petInfos')
+                .where('userId', isEqualTo: user.uid)
+                .where('name', isEqualTo: _selectedPet)
+                .limit(1)
+                .get();
+            if (petSnapshot.docs.isNotEmpty) {
+              petId = petSnapshot.docs.first.id;
+            }
+          }
+        }
+
+        // Create reminder and notification
+        await createReminderAndNotification(
+          type: 'note',
+          title: 'New Note: ${_noteType}',
+          description: _noteController.text.trim().isNotEmpty
+              ? _noteController.text.trim()
+              : 'Note for ${_selectedPet ?? "pet"}',
+          petId: petId,
+          petName: _selectedPet,
+          reminderDateTime: dateTime,
+          itemId: docRef.id,
+        );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

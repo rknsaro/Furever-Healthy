@@ -17,7 +17,7 @@ import 'my_pets/edit_pet_info.dart';
 const _mint = Color(0xFF6F994A);
 const _mintDark = Color(0xFF112F15);
 const _screenBg = Color(0xFFF6F8FB);
-const _geminiApiKey = 'AIzaSyDhC2nuwO2mvDCAnVII_Q81oKItEqsvNW4';
+const _geminiApiKey = 'AIzaSyCr5CuNb5Y2v8tUkzbbUnQJohQb4g1XI9Q';
 
 class GeminiException implements Exception {
   final int? statusCode;
@@ -93,7 +93,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
 
   Future<void> _identifyBreed() async {
     if (_isIdentifying) return; // Prevent multiple calls
-    
+
     if (_selectedImageBytes == null) {
       _showAlert(
         'Please upload an image',
@@ -241,22 +241,25 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
     String animalTypeLower,
     Map<String, dynamic> data,
   ) async {
+    // Load optional external datasets, if available
+    await loadBreedDatasets();
+
     final breedName = (data['breed'] ?? '').toString();
-    if (breedName.isEmpty) {
+    if (breedName.isEmpty || breedName.toLowerCase() == 'unknown breed') {
       return;
     }
 
     final isDog = animalTypeLower == 'dog';
+    // Try to get canonical name, but if not found, use the breed name as-is
     final canonicalName = isDog
         ? resolveTopDogCanonicalName(breedName)
         : resolveTopCatCanonicalName(breedName);
 
-    if (canonicalName == null) {
-      return;
-    }
+    // Use canonical name if available, otherwise use the original breed name
+    final finalBreedName = canonicalName ?? capitalizeBreed(breedName);
 
     final petBreed = _petBreedFromData(
-      canonicalName: canonicalName,
+      canonicalName: finalBreedName,
       animalTypeLower: animalTypeLower,
       data: data,
     );
@@ -406,9 +409,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Pet Name',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -422,10 +423,7 @@ class _IdentifyBreedScreenState extends State<IdentifyBreedScreen> {
               decoration: BoxDecoration(
                 color: _mint.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _mint.withOpacity(0.3),
-                  width: 1,
-                ),
+                border: Border.all(color: _mint.withOpacity(0.3), width: 1),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

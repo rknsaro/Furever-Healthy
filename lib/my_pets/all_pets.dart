@@ -11,6 +11,8 @@ import 'package:fureverhealthy/reminders_tab.dart';
 import 'package:fureverhealthy/recent_notes.dart';
 import 'package:fureverhealthy/view_all_notes.dart';
 import 'package:fureverhealthy/quick_actions/medications.dart';
+import 'package:fureverhealthy/quick_actions/feeding.dart';
+import 'package:fureverhealthy/quick_actions/grooming.dart';
 // import 'package:fureverhealthy/my_pets/vaccine.dart';
 import 'package:fureverhealthy/pet_medical_history.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -221,7 +223,8 @@ class _AllPetsPageState extends State<AllPetsPage>
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const IdentifyBreedScreen(),
+                                      builder: (_) =>
+                                          const IdentifyBreedScreen(),
                                     ),
                                   ),
                                 ),
@@ -243,7 +246,8 @@ class _AllPetsPageState extends State<AllPetsPage>
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) => const IdentifyBreedScreen(),
+                                        builder: (_) =>
+                                            const IdentifyBreedScreen(),
                                       ),
                                     ),
                                   );
@@ -364,6 +368,843 @@ class _ProfileTabState extends State<_ProfileTab> {
   List<String> _medicalConcerns = [];
   String? _imageUrl;
   String? _assetPath;
+  String?
+  _lastAppliedPetId; // Track last applied pet to avoid unnecessary updates
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize from initialPetData if available
+    if (widget.initialPetData != null) {
+      _applyPetData(widget.initialPetData!);
+      _lastAppliedPetId = widget.selectedPetId;
+    }
+  }
+
+  @override
+  void didUpdateWidget(_ProfileTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Update when selected pet changes
+    if (oldWidget.selectedPetId != widget.selectedPetId) {
+      _lastAppliedPetId = null; // Reset to allow update
+      if (widget.initialPetData != null) {
+        _applyPetData(widget.initialPetData!);
+        _lastAppliedPetId = widget.selectedPetId;
+      }
+    }
+  }
+
+  // ---------- Ongoing Medications Section ----------
+  Widget _buildFeedingSection(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || widget.selectedPetId == null) {
+      return _buildCard(
+        title: 'Feeding',
+        iconPath: 'assets/pet_feeding.png',
+        description: 'Plan ${_petName}\'s meals and portion sizes.',
+        buttonText: 'Add feeding',
+        onPressed: () {
+          if (widget.selectedPetId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    FeedingPage(petId: widget.selectedPetId, petName: _petName),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FeedingPage()),
+            );
+          }
+        },
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('feedings')
+          .where('userId', isEqualTo: user.uid)
+          .where('petId', isEqualTo: widget.selectedPetId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildCard(
+            title: 'Feeding',
+            iconPath: 'assets/pet_feeding.png',
+            description: 'Plan ${_petName}\'s meals and portion sizes.',
+            buttonText: 'Add feeding',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => FeedingPage(
+                    petId: widget.selectedPetId,
+                    petName: _petName,
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return _buildCard(
+            title: 'Feeding',
+            iconPath: 'assets/pet_feeding.png',
+            description: 'Plan ${_petName}\'s meals and portion sizes.',
+            buttonText: 'Add feeding',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => FeedingPage(
+                    petId: widget.selectedPetId,
+                    petName: _petName,
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
+        // Sort by createdAt in descending order (newest first)
+        final docs = snapshot.data!.docs.toList()
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTime = aData['createdAt'] as Timestamp?;
+            final bTime = bData['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime); // Descending order
+          });
+
+        if (docs.isEmpty) {
+          return _buildCard(
+            title: 'Feeding',
+            iconPath: 'assets/pet_feeding.png',
+            description: 'Plan ${_petName}\'s meals and portion sizes.',
+            buttonText: 'Add feeding',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => FeedingPage(
+                    petId: widget.selectedPetId,
+                    petName: _petName,
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Feeding Schedules',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FeedingPage(
+                            petId: widget.selectedPetId,
+                            petName: _petName,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Add feeding',
+                      style: TextStyle(
+                        color: _mint,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // List of feeding cards
+            ...docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final meal = (data['meal'] as String?)?.trim() ?? 'Meal';
+              final time = (data['time'] as String?)?.trim() ?? '';
+              final notes = (data['notes'] as String?)?.trim() ?? '';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.restaurant, color: _mint),
+                  title: Text(
+                    meal,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '$time${notes.isNotEmpty ? '\n$notes' : ''}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  isThreeLine: notes.isNotEmpty,
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildGroomingSection(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || widget.selectedPetId == null) {
+      return _buildCard(
+        title: 'Grooming',
+        iconPath: 'assets/pet_grooming.png',
+        description: 'Set a grooming routine tailored for $_petName.',
+        buttonText: 'Add grooming',
+        onPressed: () {
+          if (widget.selectedPetId != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroomingPage(
+                  petId: widget.selectedPetId,
+                  petName: _petName,
+                ),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GroomingPage()),
+            );
+          }
+        },
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('groomings')
+          .where('userId', isEqualTo: user.uid)
+          .where('petId', isEqualTo: widget.selectedPetId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildCard(
+            title: 'Grooming',
+            iconPath: 'assets/pet_grooming.png',
+            description: 'Set a grooming routine tailored for $_petName.',
+            buttonText: 'Add grooming',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroomingPage(
+                    petId: widget.selectedPetId,
+                    petName: _petName,
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return _buildCard(
+            title: 'Grooming',
+            iconPath: 'assets/pet_grooming.png',
+            description: 'Set a grooming routine tailored for $_petName.',
+            buttonText: 'Add grooming',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroomingPage(
+                    petId: widget.selectedPetId,
+                    petName: _petName,
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
+        // Sort by createdAt in descending order (newest first)
+        final docs = snapshot.data!.docs.toList()
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTime = aData['createdAt'] as Timestamp?;
+            final bTime = bData['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime); // Descending order
+          });
+
+        if (docs.isEmpty) {
+          return _buildCard(
+            title: 'Grooming',
+            iconPath: 'assets/pet_grooming.png',
+            description: 'Set a grooming routine tailored for $_petName.',
+            buttonText: 'Add grooming',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroomingPage(
+                    petId: widget.selectedPetId,
+                    petName: _petName,
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Grooming Schedules',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GroomingPage(
+                            petId: widget.selectedPetId,
+                            petName: _petName,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Add grooming',
+                      style: TextStyle(
+                        color: _mint,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // List of grooming cards
+            ...docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final type = (data['type'] as String?)?.trim() ?? 'Grooming';
+              final date = (data['date'] as String?)?.trim() ?? '';
+              final notes = (data['notes'] as String?)?.trim() ?? '';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.pets, color: _mint),
+                  title: Text(
+                    type,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '$date${notes.isNotEmpty ? '\n$notes' : ''}',
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  isThreeLine: notes.isNotEmpty,
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildOngoingMedicationsSection(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return _buildCard(
+        title: 'Ongoing Medications',
+        iconPath: 'assets/pet_medication.png',
+        description: 'Keep track of ongoing medications for $_petName.',
+        buttonText: 'Add medication',
+        onPressed: () async {
+          final added = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MedicationsPage(petName: _petName),
+            ),
+          );
+          if (added == true && mounted) setState(() {});
+        },
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('medications')
+          .where('userId', isEqualTo: user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildCard(
+            title: 'Ongoing Medications',
+            iconPath: 'assets/pet_medication.png',
+            description: 'Keep track of ongoing medications for $_petName.',
+            buttonText: 'Add medication',
+            onPressed: () async {
+              final added = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MedicationsPage(petName: _petName),
+                ),
+              );
+              if (added == true && mounted) setState(() {});
+            },
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return _buildCard(
+            title: 'Ongoing Medications',
+            iconPath: 'assets/pet_medication.png',
+            description: 'Keep track of ongoing medications for $_petName.',
+            buttonText: 'Add medication',
+            onPressed: () async {
+              final added = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MedicationsPage(petName: _petName),
+                ),
+              );
+              if (added == true && mounted) setState(() {});
+            },
+          );
+        }
+
+        // Filter medications where this pet is selected
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final pets =
+              (data['pets'] as List?)?.map((e) => e.toString()).toList() ??
+              <String>[];
+          return pets
+              .map((p) => p.trim().toLowerCase())
+              .contains(_petName.trim().toLowerCase());
+        }).toList();
+
+        if (docs.isEmpty) {
+          return _buildCard(
+            title: 'Ongoing Medications',
+            iconPath: 'assets/pet_medication.png',
+            description: 'Keep track of ongoing medications for $_petName.',
+            buttonText: 'Add medication',
+            onPressed: () async {
+              final added = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MedicationsPage(petName: _petName),
+                ),
+              );
+              if (added == true && mounted) setState(() {});
+            },
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ongoing Medications',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // List of medication cards
+            ...docs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final name = (data['name'] as String?)?.trim() ?? 'Medication';
+              final description =
+                  (data['description'] as String?)?.trim() ?? '';
+              final dosageUnit =
+                  (data['dosageUnit'] as String?)?.trim() ?? 'Pill';
+              final scheduleType =
+                  (data['scheduleType'] as String?)?.trim() ?? 'On Schedule';
+              final startDateTs = data['startDate'] as Timestamp?;
+              final endDateTs = data['endDate'] as Timestamp?;
+              final timings =
+                  (data['timings'] as List?)
+                      ?.map((t) => Map<String, dynamic>.from(t as Map))
+                      .toList() ??
+                  <Map<String, dynamic>>[];
+
+              DateTime? nextDateTime;
+              int? nextPills;
+              if (timings.isNotEmpty) {
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                // Sort timings by time of day
+                timings.sort((a, b) {
+                  final aMin = (a['hour'] as int) * 60 + (a['minute'] as int);
+                  final bMin = (b['hour'] as int) * 60 + (b['minute'] as int);
+                  return aMin.compareTo(bMin);
+                });
+                // Find first timing later today, else take first timing tomorrow
+                DateTime? candidate;
+                int? candidatePills;
+                for (final t in timings) {
+                  final dt = DateTime(
+                    today.year,
+                    today.month,
+                    today.day,
+                    (t['hour'] as int),
+                    (t['minute'] as int),
+                  );
+                  if (dt.isAfter(now)) {
+                    candidate = dt;
+                    candidatePills = (t['pills'] as int?) ?? 1;
+                    break;
+                  }
+                }
+                if (candidate == null) {
+                  final t = timings.first;
+                  candidate = today.add(const Duration(days: 1));
+                  candidate = DateTime(
+                    candidate.year,
+                    candidate.month,
+                    candidate.day,
+                    (t['hour'] as int),
+                    (t['minute'] as int),
+                  );
+                  candidatePills = (t['pills'] as int?) ?? 1;
+                }
+                // Respect start/end dates if present
+                final startDate = startDateTs?.toDate();
+                final endDate = endDateTs?.toDate();
+                if (startDate != null && candidate.isBefore(startDate)) {
+                  candidate = DateTime(
+                    startDate.year,
+                    startDate.month,
+                    startDate.day,
+                    timings.first['hour'] as int,
+                    timings.first['minute'] as int,
+                  );
+                  candidatePills = (timings.first['pills'] as int?) ?? 1;
+                }
+                if (endDate == null ||
+                    candidate.isBefore(endDate) ||
+                    candidate.isAtSameMomentAs(endDate)) {
+                  nextDateTime = candidate;
+                  nextPills = candidatePills;
+                }
+              }
+
+              String nextLine;
+              if (nextDateTime != null && nextPills != null) {
+                nextLine =
+                    'Next $nextPills $dosageUnit${nextPills == 1 ? '' : 's'}, ${DateFormat('d MMM, h:mm a').format(nextDateTime)}';
+              } else {
+                nextLine = 'Next schedule not available';
+              }
+
+              // First timing for compact row
+              String timeAndDose = '';
+              if (timings.isNotEmpty) {
+                final t = timings.first;
+                final dt = DateTime(
+                  0,
+                  1,
+                  1,
+                  (t['hour'] as int),
+                  (t['minute'] as int),
+                );
+                final timeStr = DateFormat('h:mm a').format(dt);
+                final pills = (t['pills'] as int?) ?? 1;
+                timeAndDose = '$timeStr   $pills';
+              }
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE1EDE0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: const BoxDecoration(
+                                color: _mint,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.medication,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.info_outline,
+                                color: Colors.black54,
+                              ),
+                              onPressed: () {
+                                if (description.isEmpty) return;
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: Text(name),
+                                    content: Text(description),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Close'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: Colors.black54,
+                              ),
+                              onPressed: () async {
+                                final updated = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => MedicationsPage(
+                                      medicationId: doc.id,
+                                      petName: _petName,
+                                    ),
+                                  ),
+                                );
+                                if (updated == true && mounted) setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.pets, size: 18, color: Colors.black54),
+                        const SizedBox(width: 8),
+                        Text(
+                          _petName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 18,
+                          color: Colors.black54,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          scheduleType == 'On Schedule'
+                              ? 'Every day'
+                              : 'As needed',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time,
+                          size: 18,
+                          color: Colors.black54,
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Text(
+                            timeAndDose.isNotEmpty ? timeAndDose : 'Set time',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.arrow_right_alt,
+                          size: 22,
+                          color: Colors.black54,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            nextLine,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+            // Add new medication button under list
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _mint,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () async {
+                  final added = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MedicationsPage(petName: _petName),
+                    ),
+                  );
+                  if (added == true && mounted) setState(() {});
+                },
+                child: const Text(
+                  'Add medication',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  // ---------- end Ongoing Medications Section ----------
 
   Widget _buildRecentNotesCard(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -842,6 +1683,36 @@ class _ProfileTabState extends State<_ProfileTab> {
     return _buildInitialAvatar(size);
   }
 
+  Widget _buildProfileAvatarFromData(String? imageUrl, String? assetPath) {
+    const double size = 56;
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildInitialAvatar(size),
+        ),
+      );
+    }
+
+    if (assetPath != null && assetPath.isNotEmpty) {
+      return ClipOval(
+        child: Image.asset(
+          assetPath,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildInitialAvatar(size),
+        ),
+      );
+    }
+
+    return _buildInitialAvatar(size);
+  }
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -990,13 +1861,13 @@ class _ProfileTabState extends State<_ProfileTab> {
         print('Error loading image: $e');
       }
     }
-    
+
     // Try to get breed information from PetGuideStorage
     PetBreed? breedInfo;
     final species = _petSpecies;
     final isDog = species?.toLowerCase() == 'dog';
     final breedName = _petBreed.toLowerCase();
-    
+
     try {
       final overrides = await PetGuideStorage.instance.loadOverrides();
       final breedMap = isDog ? overrides.dogs : overrides.cats;
@@ -1004,7 +1875,7 @@ class _ProfileTabState extends State<_ProfileTab> {
     } catch (e) {
       print('Error loading breed info: $e');
     }
-    
+
     // Use breed info if available, otherwise use defaults
     final breedGroup = breedInfo?.breedGroup ?? 'Unknown';
     final size = breedInfo?.size ?? 'Unknown';
@@ -1014,10 +1885,10 @@ class _ProfileTabState extends State<_ProfileTab> {
         : 'Breed information for ${_petBreed}.';
     final characteristics = breedInfo?.characteristics ?? <String, int>{};
     final careGuide = breedInfo?.careGuide ?? <String, String>{};
-    
+
     // Use pet image or create placeholder
     final finalImageBytes = imageBytes ?? Uint8List(0);
-    
+
     if (context.mounted) {
       Navigator.push(
         context,
@@ -1153,9 +2024,13 @@ class _ProfileTabState extends State<_ProfileTab> {
           data = Map<String, dynamic>.from(widget.initialPetData!);
         }
 
-        if (data != null) {
-          _applyPetData(data);
-        }
+        // Extract values directly from data for display - don't update instance variables here
+        // to avoid lifecycle issues. Instance variables will be updated via didUpdateWidget
+        final name = (data?['name'] as String?)?.trim() ?? _petName;
+        final breed = (data?['breed'] as String?)?.trim() ?? _petBreed;
+        final gender = (data?['gender'] as String?)?.trim() ?? _petGender;
+        final imageUrl = data?['imageUrl'] as String?;
+        final assetPath = data?['imageAsset'] as String?;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -1178,13 +2053,13 @@ class _ProfileTabState extends State<_ProfileTab> {
             children: [
               Row(
                 children: [
-                  _buildProfileAvatar(),
+                  _buildProfileAvatarFromData(imageUrl, assetPath),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _petName,
+                        name.isNotEmpty ? name : 'My Pet',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -1193,7 +2068,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '$_petBreed, $_petGender',
+                        '$breed, $gender',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.black54,
@@ -1209,7 +2084,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                     context,
                     MaterialPageRoute(
                       builder: (context) =>
-                          EditPetProfilePage(petId: petId, petName: _petName),
+                          EditPetProfilePage(petId: petId, petName: name),
                     ),
                   );
                   if (result == true) {
@@ -1239,36 +2114,14 @@ class _ProfileTabState extends State<_ProfileTab> {
             _buildProfileHeader(context),
             if (widget.selectedPetId != null) _buildDetailsCard(),
             _buildRecentNotesCard(context),
-            _buildCard(
-              title: 'Grooming',
-              iconPath: 'assets/pet_grooming.png',
-              description: 'Set a grooming routine tailored for $_petName.',
-              buttonText: 'Add grooming',
-              onPressed: () {},
-            ),
-            _buildCard(
-              title: 'Feeding',
-              iconPath: 'assets/pet_feeding.png',
-              description: 'Plan $_petName’s meals and portion sizes.',
-              buttonText: 'Add feeding',
-              onPressed: () {},
-            ),
-            _buildCard(
-              title: 'Ongoing Medications',
-              iconPath: 'assets/pet_medication.png',
-              description: 'Keep track of ongoing medications for $_petName.',
-              buttonText: 'Add medication',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MedicationsPage()),
-                );
-              },
-            ),
+            _buildFeedingSection(context),
+            _buildGroomingSection(context),
+            _buildOngoingMedicationsSection(context),
             _buildCard(
               title: 'Medical History',
               iconPath: 'assets/pet_vaccines.png',
-              description: 'View and manage vaccine and medicine history for $_petName.',
+              description:
+                  'View and manage vaccine and medicine history for $_petName.',
               buttonText: 'View history',
               onPressed: () {
                 if (widget.selectedPetId != null) {
@@ -1731,22 +2584,10 @@ class _RemindersTabWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasSelection = selectedPetId != null && selectedPetId!.isNotEmpty;
-    final petName = (selectedPetName?.trim().isNotEmpty ?? false)
-        ? selectedPetName!.trim()
-        : 'your pet';
-    final message = hasSelection
-        ? 'No reminders for $petName yet. Want to set one up?'
-        : 'Select a pet to view reminders.';
-    const buttonText = 'Add reminder';
-
     // 3. REPLACING THE LOCAL _RemindersTab with a call to the new file's widget
     return RemindersTab(
-      // We pass the required props to keep the logic here
-      // The button pressed logic is now inside RemindersTab
-      iconPath: 'assets/reminders.png',
-      message: message,
-      buttonText: buttonText,
+      selectedPetId: selectedPetId,
+      selectedPetName: selectedPetName,
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 import '../models/pet_breed.dart';
 
 const List<PetBreed> defaultTopDogBreeds = [
@@ -224,14 +226,95 @@ final Set<String> topCatBreedNamesLower = _catCanonicalNames.values
     .map((name) => name.toLowerCase())
     .toSet();
 
+// ====== External dataset (optional, loaded from assets) ======
+bool _datasetsLoaded = false;
+
+final Map<String, String> _extraDogCanonicalNames = <String, String>{};
+final Map<String, String> _extraCatCanonicalNames = <String, String>{};
+
+final List<PetBreed> _extraDogBreeds = <PetBreed>[];
+final List<PetBreed> _extraCatBreeds = <PetBreed>[];
+
+/// Loads optional external breed datasets from assets if present.
+///
+/// Expected files (optional):
+/// - assets/breeds/dog_breeds.json
+/// - assets/breeds/cat_breeds.json
+///
+/// File schema:
+/// [
+///   {
+///     "name": "Beagle",
+///     "synonyms": ["beagle"],
+///     "animalType": "Dog",
+///     "breedGroup": "Hound",
+///     "size": "Medium",
+///     "lifeSpan": "12-15 years",
+///     "description": "...",
+///     "characteristics": { "Friendliness": 90, "Trainability": 70 },
+///     "careGuide": { "nutrition": "...", "grooming": "...", "exercise": "...", "health": "..." }
+///   }
+/// ]
+Future<void> loadBreedDatasets() async {
+  if (_datasetsLoaded) return;
+  _datasetsLoaded = true;
+
+  Future<void> loadFile({required String path, required bool isDog}) async {
+    try {
+      final raw = await rootBundle.loadString(path);
+      final List<dynamic> list = jsonDecode(raw) as List<dynamic>;
+      for (final item in list) {
+        if (item is! Map<String, dynamic>) continue;
+        final breed = PetBreed.fromMap(item);
+        final synonyms =
+            (item['synonyms'] as List<dynamic>?)
+                ?.map((e) => e.toString())
+                .where((e) => e.trim().isNotEmpty)
+                .toList() ??
+            <String>[];
+
+        if (isDog) {
+          _extraDogBreeds.add(breed);
+          for (final s in synonyms) {
+            _extraDogCanonicalNames[s.toLowerCase().trim()] = breed.name;
+          }
+          _extraDogCanonicalNames[breed.name.toLowerCase().trim()] = breed.name;
+        } else {
+          _extraCatBreeds.add(breed);
+          for (final s in synonyms) {
+            _extraCatCanonicalNames[s.toLowerCase().trim()] = breed.name;
+          }
+          _extraCatCanonicalNames[breed.name.toLowerCase().trim()] = breed.name;
+        }
+      }
+    } catch (_) {
+      // Silently ignore if file doesn't exist or malformed; keep defaults
+    }
+  }
+
+  await Future.wait([
+    loadFile(path: 'assets/breeds/dog_breeds.json', isDog: true),
+    loadFile(path: 'assets/breeds/cat_breeds.json', isDog: false),
+  ]);
+}
+
 String? resolveTopDogCanonicalName(String breedName) {
   final lower = breedName.toLowerCase().trim();
+  // Prefer extras if loaded
+  if (_extraDogCanonicalNames.isNotEmpty) {
+    final viaExtra = _extraDogCanonicalNames[lower];
+    if (viaExtra != null && viaExtra.isNotEmpty) return viaExtra;
+  }
   return _dogCanonicalNames[lower] ??
       (topDogBreedNamesLower.contains(lower) ? capitalizeBreed(lower) : null);
 }
 
 String? resolveTopCatCanonicalName(String breedName) {
   final lower = breedName.toLowerCase().trim();
+  if (_extraCatCanonicalNames.isNotEmpty) {
+    final viaExtra = _extraCatCanonicalNames[lower];
+    if (viaExtra != null && viaExtra.isNotEmpty) return viaExtra;
+  }
   return _catCanonicalNames[lower] ??
       (topCatBreedNamesLower.contains(lower) ? capitalizeBreed(lower) : null);
 }
@@ -255,6 +338,12 @@ String capitalizeBreed(String value) {
 
 PetBreed? findDefaultDogBreedByName(String canonicalName) {
   final lower = canonicalName.toLowerCase();
+  // Prefer external
+  try {
+    return _extraDogBreeds.firstWhere(
+      (breed) => breed.name.toLowerCase() == lower,
+    );
+  } catch (_) {}
   try {
     return defaultTopDogBreeds.firstWhere(
       (breed) => breed.name.toLowerCase() == lower,
@@ -266,6 +355,11 @@ PetBreed? findDefaultDogBreedByName(String canonicalName) {
 
 PetBreed? findDefaultCatBreedByName(String canonicalName) {
   final lower = canonicalName.toLowerCase();
+  try {
+    return _extraCatBreeds.firstWhere(
+      (breed) => breed.name.toLowerCase() == lower,
+    );
+  } catch (_) {}
   try {
     return defaultTopCatBreeds.firstWhere(
       (breed) => breed.name.toLowerCase() == lower,

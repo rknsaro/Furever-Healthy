@@ -60,14 +60,14 @@ class _CommunityForumsTabState extends State<CommunityForumsTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: Text(
-                'FH Community',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1F2937),
-                ),
-              ),
+              // child: Text(
+              //   'FH Community',
+              //   style: const TextStyle(
+              //     fontSize: 18,
+              //     fontWeight: FontWeight.w800,
+              //     color: Color(0xFF1F2937),
+              //   ),
+              // ),
             ),
             const SizedBox(height: 8),
             if (subTitle != null)

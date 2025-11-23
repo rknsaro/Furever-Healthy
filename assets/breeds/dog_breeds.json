@@ -1,0 +1,45 @@
+[
+  {
+    "name": "Beagle",
+    "synonyms": ["beagle"],
+    "animalType": "Dog",
+    "breedGroup": "Hound",
+    "size": "Medium",
+    "lifeSpan": "12-15 years",
+    "description": "Beagles are cheerful, curious hounds with strong scenting abilities and friendly temperaments. They are great with families and enjoy active play.",
+    "characteristics": {
+      "Friendliness": 90,
+      "Trainability": 70,
+      "Energy Level": 85,
+      "Shedding": 60
+    },
+    "careGuide": {
+      "nutrition": "Feed a balanced diet with high-quality protein. Monitor portions as Beagles can overeat. Use slow feeders if needed.",
+      "grooming": "Brush weekly and bathe every 4-6 weeks. Check ears regularly as floppy ears can trap moisture.",
+      "exercise": "Provide 60 minutes of daily exercise including walks and sniff games. Mental stimulation via scent work is ideal.",
+      "health": "Watch for ear infections, obesity, and intervertebral disc disease. Keep up with routine veterinary care."
+    }
+  },
+  {
+    "name": "Golden Retriever",
+    "synonyms": ["golden retriever", "golden"],
+    "animalType": "Dog",
+    "breedGroup": "Sporting",
+    "size": "Large",
+    "lifeSpan": "10-12 years",
+    "description": "Golden Retrievers are affectionate, intelligent, and eager-to-please family dogs. They excel in training and love outdoor activities and water.",
+    "characteristics": {
+      "Friendliness": 95,
+      "Trainability": 90,
+      "Energy Level": 80,
+      "Shedding": 80
+    },
+    "careGuide": {
+      "nutrition": "Choose large-breed formulas with joint support. Portion meals twice daily and monitor weight.",
+      "grooming": "Brush 2-3 times weekly (daily during shedding). Bathe every 4-6 weeks and keep ears dry.",
+      "exercise": "Provide 60-90 minutes of activity—walks, swimming, and retrieving games. Include obedience for mental work.",
+      "health": "Monitor for hip/elbow dysplasia, skin allergies, ear infections, and certain cancers. Maintain regular vet care."
+    }
+  }
+]
+

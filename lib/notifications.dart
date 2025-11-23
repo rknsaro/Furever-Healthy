@@ -58,7 +58,9 @@ class _NotificationsListState extends State<_NotificationsList> {
           .where('userId', isEqualTo: user.uid)
           .snapshots();
       _startAppointmentsSync(user.uid);
-      _startCareAdviceSync(user.uid); // This is async but we don't need to await
+      _startCareAdviceSync(
+        user.uid,
+      ); // This is async but we don't need to await
     }
   }
 
@@ -141,7 +143,9 @@ class _NotificationsListState extends State<_NotificationsList> {
         // Skip initial load - only process real-time changes
         if (_isInitialAppointmentsLoad) {
           _isInitialAppointmentsLoad = false;
-          debugPrint('Appointments sync: Skipping initial load, only processing real-time changes');
+          debugPrint(
+            'Appointments sync: Skipping initial load, only processing real-time changes',
+          );
           return;
         }
 
@@ -173,14 +177,20 @@ class _NotificationsListState extends State<_NotificationsList> {
 
           // Check existing notification to see if status changed
           // This prevents notifications when appointments are updated for other reasons (like care advice edits)
-          final existingNotification = await notificationsRef.doc(appointmentId).get();
+          final existingNotification = await notificationsRef
+              .doc(appointmentId)
+              .get();
           if (existingNotification.exists) {
-            final existingStatus = (existingNotification.data()?['status'] as String?)
-                ?.toLowerCase().trim();
-            
+            final existingStatus =
+                (existingNotification.data()?['status'] as String?)
+                    ?.toLowerCase()
+                    .trim();
+
             // Status hasn't changed - this is just an update to other fields (like care advice edits)
             if (existingStatus == status) {
-              debugPrint('Appointment $appointmentId: Status unchanged ($status), skipping notification (likely non-status field update)');
+              debugPrint(
+                'Appointment $appointmentId: Status unchanged ($status), skipping notification (likely non-status field update)',
+              );
               continue;
             }
           }
@@ -207,7 +217,9 @@ class _NotificationsListState extends State<_NotificationsList> {
 
             // Double check - only create/update notification if status actually changed
             if (!isStatusChanged) {
-              debugPrint('Appointment $appointmentId: Status unchanged ($status), skipping notification');
+              debugPrint(
+                'Appointment $appointmentId: Status unchanged ($status), skipping notification',
+              );
               return;
             }
 
@@ -224,16 +236,19 @@ class _NotificationsListState extends State<_NotificationsList> {
               'isRead': false,
               'updatedAt': FieldValue.serverTimestamp(),
             };
-            
+
             // Preserve existing createdAt if notification already exists, otherwise set new one
-            if (existingSnap.exists && existingSnap.data()?['createdAt'] != null) {
+            if (existingSnap.exists &&
+                existingSnap.data()?['createdAt'] != null) {
               payload['createdAt'] = existingSnap.data()?['createdAt'];
             } else {
               payload['createdAt'] = FieldValue.serverTimestamp();
             }
 
             txn.set(notificationRef, payload, SetOptions(merge: true));
-            debugPrint('Appointment notification updated: $appointmentId - Status changed from $previousStatus to $status');
+            debugPrint(
+              'Appointment notification updated: $appointmentId - Status changed from $previousStatus to $status',
+            );
           });
         }
       },
@@ -260,7 +275,9 @@ class _NotificationsListState extends State<_NotificationsList> {
           .where((breed) => breed.isNotEmpty)
           .toSet();
 
-      debugPrint('Care advice sync: Found ${userPetBreeds.length} pet breeds: $userPetBreeds');
+      debugPrint(
+        'Care advice sync: Found ${userPetBreeds.length} pet breeds: $userPetBreeds',
+      );
 
       if (userPetBreeds.isEmpty) {
         debugPrint('Care advice sync: No pets found, skipping');
@@ -281,7 +298,9 @@ class _NotificationsListState extends State<_NotificationsList> {
           .whereType<String>()
           .toSet();
 
-      debugPrint('Care advice sync: Found ${userVetIds.length} vet IDs from appointments: $userVetIds');
+      debugPrint(
+        'Care advice sync: Found ${userVetIds.length} vet IDs from appointments: $userVetIds',
+      );
 
       // Don't process existing care advice on initial load - only listen for real-time updates
       // This ensures notifications only appear when care advice is actually edited/added
@@ -291,46 +310,52 @@ class _NotificationsListState extends State<_NotificationsList> {
           .collection('careAdvice')
           .snapshots()
           .listen(
-        (snapshot) async {
-          // Skip initial load - only process real-time changes
-          if (_isInitialCareAdviceLoad) {
-            _isInitialCareAdviceLoad = false;
-            debugPrint('Care advice sync: Skipping initial load, only processing real-time changes');
-            return;
-          }
-
-          debugPrint('Care advice listener: Received snapshot with ${snapshot.docChanges.length} real-time changes');
-          for (final change in snapshot.docChanges) {
-            // Only process new additions and modifications (real-time updates)
-            if (change.type == DocumentChangeType.added ||
-                change.type == DocumentChangeType.modified) {
-              final doc = change.doc;
-              final data = doc.data();
-              if (data != null) {
-                debugPrint('Care advice listener: Processing real-time update for document ${doc.id} (type: ${change.type})');
-                await _processCareAdviceDocument(
-                  doc.id,
-                  data,
-                  userId,
-                  userPetBreeds,
-                  userVetIds,
-                  petsSnapshot.docs,
+            (snapshot) async {
+              // Skip initial load - only process real-time changes
+              if (_isInitialCareAdviceLoad) {
+                _isInitialCareAdviceLoad = false;
+                debugPrint(
+                  'Care advice sync: Skipping initial load, only processing real-time changes',
                 );
+                return;
               }
-            }
-          }
-        },
-        onError: (error) {
-          debugPrint('Error in care advice listener: $error');
-        },
-      );
-      debugPrint('Care advice listener: Started listening to careAdvice collection');
 
+              debugPrint(
+                'Care advice listener: Received snapshot with ${snapshot.docChanges.length} real-time changes',
+              );
+              for (final change in snapshot.docChanges) {
+                // Only process new additions and modifications (real-time updates)
+                if (change.type == DocumentChangeType.added ||
+                    change.type == DocumentChangeType.modified) {
+                  final doc = change.doc;
+                  final data = doc.data();
+                  if (data != null) {
+                    debugPrint(
+                      'Care advice listener: Processing real-time update for document ${doc.id} (type: ${change.type})',
+                    );
+                    await _processCareAdviceDocument(
+                      doc.id,
+                      data,
+                      userId,
+                      userPetBreeds,
+                      userVetIds,
+                      petsSnapshot.docs,
+                    );
+                  }
+                }
+              }
+            },
+            onError: (error) {
+              debugPrint('Error in care advice listener: $error');
+            },
+          );
+      debugPrint(
+        'Care advice listener: Started listening to careAdvice collection',
+      );
     } catch (e) {
       debugPrint('Error starting care advice sync: $e');
     }
   }
-
 
   Future<void> _processCareAdviceDocument(
     String careAdviceId,
@@ -350,7 +375,9 @@ class _NotificationsListState extends State<_NotificationsList> {
 
       // Check if user has appointments with this vet
       if (!userVetIds.contains(vetId)) {
-        debugPrint('Care advice $careAdviceId: User has no appointments with vet $vetId');
+        debugPrint(
+          'Care advice $careAdviceId: User has no appointments with vet $vetId',
+        );
         return;
       }
 
@@ -363,68 +390,93 @@ class _NotificationsListState extends State<_NotificationsList> {
             .get();
         if (vetDoc.exists) {
           final vetData = vetDoc.data();
-          vetName = (vetData?['name'] as String?)?.trim() ??
-                    (vetData?['displayName'] as String?)?.trim() ??
-                    (vetData?['vetName'] as String?)?.trim() ??
-                    'Vet';
+          vetName =
+              (vetData?['name'] as String?)?.trim() ??
+              (vetData?['displayName'] as String?)?.trim() ??
+              (vetData?['vetName'] as String?)?.trim() ??
+              'Vet';
         }
       } catch (e) {
         debugPrint('Care advice $careAdviceId: Error fetching vet name: $e');
       }
 
       // Match by breed
-      final adviceBreed = (adviceData['breed'] as String?)?.toLowerCase().trim();
+      final adviceBreed = (adviceData['breed'] as String?)
+          ?.toLowerCase()
+          .trim();
       if (adviceBreed == null || adviceBreed.isEmpty) {
         debugPrint('Care advice $careAdviceId: No breed field found');
         return;
       }
 
-      debugPrint('Care advice $careAdviceId: Checking breed match - advice breed: "$adviceBreed", user breeds: $userPetBreeds');
+      debugPrint(
+        'Care advice $careAdviceId: Checking breed match - advice breed: "$adviceBreed", user breeds: $userPetBreeds',
+      );
 
       // Check if user has a pet with matching breed (more flexible matching)
       bool breedMatches = false;
-      
+
       for (final userBreed in userPetBreeds) {
         // Normalize both breeds for comparison (remove extra spaces, normalize case)
         final normalizedUserBreed = userBreed.toLowerCase().trim();
         final normalizedAdviceBreed = adviceBreed.toLowerCase().trim();
-        
+
         // Exact match after normalization
         if (normalizedUserBreed == normalizedAdviceBreed) {
           breedMatches = true;
-          debugPrint('Care advice $careAdviceId: Exact breed match found: "$userBreed" == "$adviceBreed"');
+          debugPrint(
+            'Care advice $careAdviceId: Exact breed match found: "$userBreed" == "$adviceBreed"',
+          );
           break;
         }
-        
+
         // Partial match (one contains the other)
-        if (normalizedUserBreed.contains(normalizedAdviceBreed) || 
+        if (normalizedUserBreed.contains(normalizedAdviceBreed) ||
             normalizedAdviceBreed.contains(normalizedUserBreed)) {
           breedMatches = true;
-          debugPrint('Care advice $careAdviceId: Partial breed match found: "$userBreed" contains or is contained in "$adviceBreed"');
+          debugPrint(
+            'Care advice $careAdviceId: Partial breed match found: "$userBreed" contains or is contained in "$adviceBreed"',
+          );
           break;
         }
-        
+
         // Try matching without common words
         final userBreedClean = normalizedUserBreed
-            .replaceAll(RegExp(r'\b(shorthair|longhair|mix|mixed|domestic)\b', caseSensitive: false), '')
+            .replaceAll(
+              RegExp(
+                r'\b(shorthair|longhair|mix|mixed|domestic)\b',
+                caseSensitive: false,
+              ),
+              '',
+            )
             .trim();
         final adviceBreedClean = normalizedAdviceBreed
-            .replaceAll(RegExp(r'\b(shorthair|longhair|mix|mixed|domestic)\b', caseSensitive: false), '')
+            .replaceAll(
+              RegExp(
+                r'\b(shorthair|longhair|mix|mixed|domestic)\b',
+                caseSensitive: false,
+              ),
+              '',
+            )
             .trim();
-            
+
         if (userBreedClean.isNotEmpty && adviceBreedClean.isNotEmpty) {
           if (userBreedClean == adviceBreedClean ||
               userBreedClean.contains(adviceBreedClean) ||
               adviceBreedClean.contains(userBreedClean)) {
             breedMatches = true;
-            debugPrint('Care advice $careAdviceId: Cleaned breed match found: "$userBreedClean" matches "$adviceBreedClean"');
+            debugPrint(
+              'Care advice $careAdviceId: Cleaned breed match found: "$userBreedClean" matches "$adviceBreedClean"',
+            );
             break;
           }
         }
       }
 
       if (!breedMatches) {
-        debugPrint('Care advice $careAdviceId: No breed match - advice breed: "$adviceBreed", user breeds: $userPetBreeds');
+        debugPrint(
+          'Care advice $careAdviceId: No breed match - advice breed: "$adviceBreed", user breeds: $userPetBreeds',
+        );
         return;
       }
 
@@ -436,17 +488,21 @@ class _NotificationsListState extends State<_NotificationsList> {
       // Use careAdvice document ID + userId to ensure uniqueness per user
       final notificationId = 'careAdvice_${careAdviceId}_$userId';
 
-      debugPrint('Care advice $careAdviceId: Attempting to create notification with ID: $notificationId');
+      debugPrint(
+        'Care advice $careAdviceId: Attempting to create notification with ID: $notificationId',
+      );
 
       await FirebaseFirestore.instance.runTransaction((txn) async {
         final notificationRef = notificationsRef.doc(notificationId);
         final existingSnap = await txn.get(notificationRef);
 
-        debugPrint('Care advice $careAdviceId: Notification $notificationId exists: ${existingSnap.exists}');
+        debugPrint(
+          'Care advice $careAdviceId: Notification $notificationId exists: ${existingSnap.exists}',
+        );
 
         final title = (adviceData['title'] as String?)?.trim() ?? 'Care Advice';
         final advice = (adviceData['advice'] as String?)?.trim() ?? '';
-        
+
         // Find matching pet name for better message
         String? petName;
         for (final petDoc in petsSnapshot) {
@@ -466,9 +522,8 @@ class _NotificationsListState extends State<_NotificationsList> {
         final isNew = !existingSnap.exists;
         final existingTitle = existingSnap.data()?['title'] as String?;
         final existingAdvice = existingSnap.data()?['advice'] as String?;
-        final contentChanged = isNew || 
-            (existingTitle != title) || 
-            (existingAdvice != advice);
+        final contentChanged =
+            isNew || (existingTitle != title) || (existingAdvice != advice);
 
         // Only create/update notification if it's new or content changed
         if (contentChanged) {
@@ -488,17 +543,25 @@ class _NotificationsListState extends State<_NotificationsList> {
           if (isNew) {
             payload['createdAt'] = FieldValue.serverTimestamp();
             payload['isRead'] = false;
-            debugPrint('Care advice notification created: $notificationId for user $userId - "$title" for breed $adviceBreed');
+            debugPrint(
+              'Care advice notification created: $notificationId for user $userId - "$title" for breed $adviceBreed',
+            );
           } else {
             // For edits, keep existing createdAt but mark as unread
-            payload['createdAt'] = existingSnap.data()?['createdAt'] ?? FieldValue.serverTimestamp();
+            payload['createdAt'] =
+                existingSnap.data()?['createdAt'] ??
+                FieldValue.serverTimestamp();
             payload['isRead'] = false;
-            debugPrint('Care advice notification updated: $notificationId for user $userId - "$title" (care advice was edited)');
+            debugPrint(
+              'Care advice notification updated: $notificationId for user $userId - "$title" (care advice was edited)',
+            );
           }
 
           txn.set(notificationRef, payload);
         } else {
-          debugPrint('Care advice notification unchanged: $notificationId (no content changes)');
+          debugPrint(
+            'Care advice notification unchanged: $notificationId (no content changes)',
+          );
         }
       });
     } catch (e) {
@@ -597,9 +660,9 @@ class _NotificationTile extends StatelessWidget {
                                 context,
                                 docId,
                                 content.status,
-                                data['appointmentId'] as String? ?? 
-                                data['careAdviceId'] as String? ?? 
-                                docId,
+                                data['appointmentId'] as String? ??
+                                    data['careAdviceId'] as String? ??
+                                    docId,
                               );
                             }
                           },
@@ -747,6 +810,35 @@ class _NotificationTile extends StatelessWidget {
       );
     }
 
+    // Handle reminder notifications (note, feeding, grooming, medication)
+    if (type == 'note' ||
+        type == 'feeding' ||
+        type == 'grooming' ||
+        type == 'medication') {
+      final title = (data['title'] as String?)?.trim().isNotEmpty == true
+          ? data['title'] as String
+          : 'New Reminder';
+      final message = (data['message'] as String?)?.trim().isNotEmpty == true
+          ? data['message'] as String
+          : 'A new reminder has been created.';
+      final petName = (data['petName'] as String?)?.trim().isNotEmpty == true
+          ? data['petName'] as String
+          : '';
+
+      String? timestampText;
+      if (data['createdAt'] is Timestamp) {
+        final created = (data['createdAt'] as Timestamp).toDate();
+        timestampText = DateFormat('MMM d, yyyy • h:mm a').format(created);
+      }
+
+      return _NotificationContent(
+        status: type ?? 'reminder',
+        title: title,
+        message: petName.isNotEmpty ? '$message\nFor: $petName' : message,
+        timestamp: timestampText,
+      );
+    }
+
     final status =
         (data['status'] as String?)?.toLowerCase().trim() ?? 'pending';
     final vetName = (data['vetName'] as String?)?.trim().isNotEmpty == true
@@ -831,6 +923,14 @@ class _NotificationTile extends StatelessWidget {
         return Colors.blue;
       case 'careAdvice':
         return Colors.purple;
+      case 'note':
+        return Colors.blue;
+      case 'feeding':
+        return Colors.orange;
+      case 'grooming':
+        return Colors.purple;
+      case 'medication':
+        return Colors.red;
       default:
         return _mint;
     }
