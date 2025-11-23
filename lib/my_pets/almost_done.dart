@@ -5,11 +5,12 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../home_page.dart';
+import '../services/breed_tips_service.dart';
 
 const _mint = Color(0xFF6F994A);
 
@@ -418,7 +419,9 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(_mint),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        _mint,
+                                      ),
                                     ),
                                   )
                                 : Text(
@@ -456,9 +459,9 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
 
   Future<void> _saveAndNavigateToHome() async {
     if (_isSaving) return; // Prevent multiple calls
-    
+
     setState(() => _isSaving = true);
-    
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -533,7 +536,25 @@ class _AlmostDoneScreenState extends State<AlmostDoneScreen> {
       };
 
       // Save to Firebase
-      await FirebaseFirestore.instance.collection('petInfos').add(petData);
+      final docRef = await FirebaseFirestore.instance
+          .collection('petInfos')
+          .add(petData);
+
+      // Trigger breed tips for the new pet immediately (force send for new pets)
+      final breed = widget.breed?.trim();
+      if (breed != null &&
+          breed.isNotEmpty &&
+          breed.toLowerCase() != 'unknown') {
+        debugPrint('Triggering breed tips for newly created pet: $breed');
+        // Use forceSend=true for newly created pets to bypass 7-day check
+        BreedTipsService()
+            .sendBreedTips(specificPetId: docRef.id, forceSend: true)
+            .catchError((e) {
+              debugPrint('Error sending breed tips: $e');
+            });
+      } else {
+        debugPrint('Skipping breed tips: breed is "$breed"');
+      }
 
       // Show snackbar and navigate
       if (mounted) {

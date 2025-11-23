@@ -346,7 +346,6 @@ class _AllPetsPageState extends State<AllPetsPage>
   }
 }
 
-// ====================== PROFILE TAB ======================
 class _ProfileTab extends StatefulWidget {
   final String? selectedPetId;
   final Map<String, dynamic>? initialPetData;
@@ -2159,7 +2158,6 @@ class _ProfileTabState extends State<_ProfileTab> {
   }
 }
 
-// ====================== APPOINTMENTS TAB ======================
 class _AppointmentsTab extends StatefulWidget {
   final String? selectedPetId;
   final String? selectedPetName;
@@ -2575,7 +2573,6 @@ class _AppointmentsTabState extends State<_AppointmentsTab> {
   }
 }
 
-// ====================== REMINDERS TAB WRAPPER (to use the external file) ======================
 class _RemindersTabWrapper extends StatelessWidget {
   final String? selectedPetId;
   final String? selectedPetName;
@@ -2592,8 +2589,6 @@ class _RemindersTabWrapper extends StatelessWidget {
   }
 }
 
-// ====================== REUSABLE EMPTY STATE (made public) ======================
-// 2. RENAMED FROM _EmptyStateWidget to EmptyStateWidget (removed underscore)
 class EmptyStateWidget extends StatelessWidget {
   final String iconPath;
   final String message;
@@ -2646,7 +2641,6 @@ class EmptyStateWidget extends StatelessWidget {
   }
 }
 
-// ====================== PET CIRCLE ======================
 class _PetCircle extends StatelessWidget {
   final String name;
   final String? imageUrl;
@@ -2756,7 +2750,6 @@ class _PetCircle extends StatelessWidget {
   }
 }
 
-// ====================== ADD NEW PET CIRCLE ======================
 class _AddCircle extends StatelessWidget {
   final VoidCallback onTap;
 

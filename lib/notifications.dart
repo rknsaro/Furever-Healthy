@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fureverhealthy/services/breed_tips_service.dart';
 
 const _mint = Color(0xFF6F994A);
 const _screenBg = Color(0xFFF6F8FB);
@@ -23,6 +24,83 @@ class NotificationsPage extends StatelessWidget {
           'Notifications',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
+        actions: [
+          // Debug button to manually trigger breed tips (for testing)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) async {
+              if (value == 'refresh_tips') {
+                try {
+                  await BreedTipsService().sendBreedTips();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Breed tips refreshed!'),
+                        backgroundColor: _mint,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              } else if (value == 'force_tips') {
+                try {
+                  await BreedTipsService().forceSendBreedTips();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Breed tips force sent! Check notifications.',
+                        ),
+                        backgroundColor: _mint,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'refresh_tips',
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(width: 8),
+                    Text('Refresh Breed Tips'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'force_tips',
+                child: Row(
+                  children: [
+                    Icon(Icons.send, size: 20),
+                    SizedBox(width: 8),
+                    Text('Force Send Breed Tips'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: const _NotificationsList(),
     );
@@ -788,6 +866,25 @@ class _NotificationTile extends StatelessWidget {
       );
     }
 
+    // Handle breed tip notifications
+    if (type == 'breedtip' || type == 'breedTip') {
+      final petName = (data['petName'] as String?)?.trim().isNotEmpty == true
+          ? data['petName'] as String
+          : 'your pet';
+      final message = (data['message'] as String?)?.trim() ?? '';
+      String? timestampText;
+      if (data['createdAt'] is Timestamp) {
+        final created = (data['createdAt'] as Timestamp).toDate();
+        timestampText = DateFormat('MMM d, yyyy • h:mm a').format(created);
+      }
+      return _NotificationContent(
+        status: 'breedTip',
+        title: 'Breed Care Tip for $petName',
+        message: message,
+        timestamp: timestampText,
+      );
+    }
+
     // Handle community like notifications
     if (type == 'like') {
       final actorName =
@@ -923,6 +1020,8 @@ class _NotificationTile extends StatelessWidget {
         return Colors.blue;
       case 'careAdvice':
         return Colors.purple;
+      case 'breedTip':
+        return Colors.teal;
       case 'note':
         return Colors.blue;
       case 'feeding':

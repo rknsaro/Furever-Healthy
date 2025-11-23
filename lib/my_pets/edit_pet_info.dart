@@ -1,7 +1,7 @@
 // lib/my_pets/edit_pet_info.dart
 import 'dart:io' show File;
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,6 +10,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../identify_breed.dart';
 import '../home_page.dart';
 import 'almost_done.dart';
+import '../services/breed_tips_service.dart';
 
 const _mint = Color(0xFF6F994A);
 
@@ -315,7 +316,8 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
   @override
   void initState() {
     super.initState();
-    if (widget.isFromBreedIdentification && widget.breedFromIdentification != null) {
+    if (widget.isFromBreedIdentification &&
+        widget.breedFromIdentification != null) {
       _selectedBreed = widget.breedFromIdentification;
       _breedController.text = widget.breedFromIdentification!;
     } else if (_selectedBreed != null) {
@@ -360,7 +362,8 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
 
     // Prepare image provider
     ImageProvider? imageProvider;
-    if (widget.isFromBreedIdentification && widget.imageBytesFromIdentification != null) {
+    if (widget.isFromBreedIdentification &&
+        widget.imageBytesFromIdentification != null) {
       imageProvider = MemoryImage(widget.imageBytesFromIdentification!);
     } else if (widget.pickedBytes != null) {
       imageProvider = MemoryImage(widget.pickedBytes!);
@@ -553,7 +556,8 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                                   child: GestureDetector(
                                     onTap: widget.isFromBreedIdentification
                                         ? null
-                                        : () => _showBreedModal(context, breeds),
+                                        : () =>
+                                              _showBreedModal(context, breeds),
                                     child: Container(
                                       height: 50,
                                       decoration: BoxDecoration(
@@ -724,14 +728,23 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                               controller: _weightController,
                               keyboardType: TextInputType.number,
                               decoration: InputDecoration(
-                                hintText: "Weight",
+                                hintText: "Weight (kg)",
                                 hintStyle: TextStyle(
                                   color: Colors.grey.shade400,
                                 ),
-                                suffixIcon: Icon(
-                                  Icons.monitor_weight_rounded,
-                                  color: _mint,
-                                  size: 20,
+                                suffixText: "kg",
+                                suffixStyle: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                suffixIcon: Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Icon(
+                                    Icons.monitor_weight_rounded,
+                                    color: _mint,
+                                    size: 20,
+                                  ),
                                 ),
                                 filled: true,
                                 fillColor: Colors.white,
@@ -802,35 +815,44 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
                             onTap: _isSaving
                                 ? null
                                 : (widget.isFromBreedIdentification
-                                    ? _savePetDirectly
-                                    : () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => AlmostDoneScreen(
-                                              petName: widget.petName,
-                                              petType: widget.petType,
-                                              breed: _selectedBreed,
-                                              gender: _selectedGender,
-                                              birthDate: _birthDate,
-                                              weight: _weightController.text.trim(),
-                                              pickedPhoto: widget.pickedPhoto,
-                                              pickedBytes: widget.pickedBytes,
+                                      ? _savePetDirectly
+                                      : () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  AlmostDoneScreen(
+                                                    petName: widget.petName,
+                                                    petType: widget.petType,
+                                                    breed: _selectedBreed,
+                                                    gender: _selectedGender,
+                                                    birthDate: _birthDate,
+                                                    weight: _weightController
+                                                        .text
+                                                        .trim(),
+                                                    pickedPhoto:
+                                                        widget.pickedPhoto,
+                                                    pickedBytes:
+                                                        widget.pickedBytes,
+                                                  ),
                                             ),
-                                          ),
-                                        );
-                                      }),
+                                          );
+                                        }),
                             child: _isSaving
                                 ? SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(_mint),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        _mint,
+                                      ),
                                     ),
                                   )
                                 : Text(
-                                    widget.isFromBreedIdentification ? 'Save' : 'Next',
+                                    widget.isFromBreedIdentification
+                                        ? 'Save'
+                                        : 'Next',
                                     style: TextStyle(
                                       color: _isSaving ? Colors.grey : _mint,
                                       fontSize: 16,
@@ -853,9 +875,9 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
 
   Future<void> _savePetDirectly() async {
     if (_isSaving) return; // Prevent multiple calls
-    
+
     setState(() => _isSaving = true);
-    
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -872,7 +894,8 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
       String? storagePath;
 
       // Use imageBytesFromIdentification if available, otherwise use pickedBytes or pickedPhoto
-      final imageBytes = widget.imageBytesFromIdentification ?? widget.pickedBytes;
+      final imageBytes =
+          widget.imageBytesFromIdentification ?? widget.pickedBytes;
       final pickedPhoto = widget.pickedPhoto;
 
       if (imageBytes != null || pickedPhoto != null) {
@@ -933,7 +956,25 @@ class _EditPetInfoPageState extends State<EditPetInfoPage> {
       };
 
       // Save to Firebase
-      await FirebaseFirestore.instance.collection('petInfos').add(petData);
+      final docRef = await FirebaseFirestore.instance
+          .collection('petInfos')
+          .add(petData);
+
+      // Trigger breed tips for the new pet immediately (force send for new pets)
+      final breed = _selectedBreed?.trim();
+      if (breed != null &&
+          breed.isNotEmpty &&
+          breed.toLowerCase() != 'unknown') {
+        debugPrint('Triggering breed tips for newly created pet: $breed');
+        // Use forceSend=true for newly created pets to bypass 7-day check
+        BreedTipsService()
+            .sendBreedTips(specificPetId: docRef.id, forceSend: true)
+            .catchError((e) {
+              debugPrint('Error sending breed tips: $e');
+            });
+      } else {
+        debugPrint('Skipping breed tips: breed is "$breed"');
+      }
 
       // Show snackbar and navigate
       if (mounted) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'gemini_service.dart';
 
 const _mint = Color(0xFF6F994A);
@@ -36,6 +37,8 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
   String _activeCareGuideTab = 'Nutrition';
   bool _isLoadingInfo = false;
   bool _hasFetchedInfo = false;
+  bool _isLoadingContents = false;
+  String? _fetchedContents; // Store contents from database
 
   // Mutable state for breed information
   late String _breedGroup;
@@ -76,6 +79,9 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
 
     // Check if information is missing and fetch it
     _checkAndFetchMissingInfo();
+
+    // Fetch contents from database
+    _fetchContentsFromDatabase();
   }
 
   void _checkIfMixedBreed() {
@@ -219,6 +225,98 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
             backgroundColor: Colors.orange,
           ),
         );
+      }
+    }
+  }
+
+  /// Fetches contents from Firestore database for the breed
+  Future<void> _fetchContentsFromDatabase() async {
+    if (_isLoadingContents) return;
+
+    setState(() {
+      _isLoadingContents = true;
+    });
+
+    try {
+      final breedName = widget.breed.toLowerCase().trim();
+
+      // Try to fetch from 'breedGuides' collection first
+      final breedGuidesQuery = await FirebaseFirestore.instance
+          .collection('breedGuides')
+          .where('breedName', isEqualTo: breedName)
+          .limit(1)
+          .get();
+
+      if (breedGuidesQuery.docs.isNotEmpty) {
+        final doc = breedGuidesQuery.docs.first;
+        final data = doc.data();
+        final contents = data['contents']?.toString();
+
+        if (contents != null && contents.isNotEmpty && mounted) {
+          setState(() {
+            _fetchedContents = contents;
+            _isLoadingContents = false;
+          });
+          return;
+        }
+      }
+
+      // If not found in breedGuides, try 'breedContents' collection
+      final breedContentsQuery = await FirebaseFirestore.instance
+          .collection('breedContents')
+          .where('breedName', isEqualTo: breedName)
+          .limit(1)
+          .get();
+
+      if (breedContentsQuery.docs.isNotEmpty) {
+        final doc = breedContentsQuery.docs.first;
+        final data = doc.data();
+        final contents = data['contents']?.toString();
+
+        if (contents != null && contents.isNotEmpty && mounted) {
+          setState(() {
+            _fetchedContents = contents;
+            _isLoadingContents = false;
+          });
+          return;
+        }
+      }
+
+      // If still not found, try matching by breed name in any field
+      final alternativeQuery = await FirebaseFirestore.instance
+          .collection('breedGuides')
+          .where('breed', isEqualTo: breedName)
+          .limit(1)
+          .get();
+
+      if (alternativeQuery.docs.isNotEmpty) {
+        final doc = alternativeQuery.docs.first;
+        final data = doc.data();
+        final contents = data['contents']?.toString();
+
+        if (contents != null && contents.isNotEmpty && mounted) {
+          setState(() {
+            _fetchedContents = contents;
+            _isLoadingContents = false;
+          });
+          return;
+        }
+      }
+
+      // No contents found
+      if (mounted) {
+        setState(() {
+          _fetchedContents = null;
+          _isLoadingContents = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching contents from database: $e');
+      if (mounted) {
+        setState(() {
+          _fetchedContents = null;
+          _isLoadingContents = false;
+        });
       }
     }
   }
@@ -751,6 +849,66 @@ class _BreedDetailScreenState extends State<BreedDetailScreen> {
                 style: const TextStyle(fontSize: 15, color: Colors.black87),
               ),
             ),
+            const SizedBox(height: 20),
+
+            // Contents from Database Section
+            if (_isLoadingContents)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(color: _mint),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Loading breed guide...',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (_fetchedContents != null && _fetchedContents!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Breed Guide',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            blurRadius: 5,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _fetchedContents!,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Colors.black87,
+                          height: 1.6,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 20),
 
             // Characteristics
