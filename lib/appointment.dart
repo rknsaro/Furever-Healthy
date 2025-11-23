@@ -22,6 +22,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
   String? selectedFilterType;
   String? selectedFilterValue;
   bool _showAppointments = false; // Toggle between vets and appointments
+  String? _selectedStatusFilter; // Filter by appointment status
   StreamSubscription<QuerySnapshot>? _vetsSubscription;
 
   @override
@@ -324,11 +325,20 @@ class _AppointmentPageState extends State<AppointmentPage> {
                       ),
                     ),
                     Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 16 : screenWidth * 0.05,
-                        ),
-                        child: _buildAppointmentsList(),
+                      child: Column(
+                        children: [
+                          // Status filter tabs
+                          _buildStatusFilterTabs(),
+                          // Appointments list
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 16 : screenWidth * 0.05,
+                              ),
+                              child: _buildAppointmentsList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -770,6 +780,96 @@ class _AppointmentPageState extends State<AppointmentPage> {
     );
   }
 
+  // Build status filter tabs
+  Widget _buildStatusFilterTabs() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
+    final statusFilters = [
+      {'label': 'All', 'value': null},
+      {'label': 'Pending', 'value': 'pending'},
+      {'label': 'Confirmed', 'value': 'confirmed'},
+      {'label': 'Completed', 'value': 'completed'},
+      {'label': 'Declined', 'value': 'declined'},
+      {'label': 'Cancelled', 'value': 'cancelled'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: statusFilters.map((filter) {
+            final isSelected = _selectedStatusFilter == filter['value'];
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedStatusFilter = filter['value'];
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 14 : 18,
+                      vertical: isSmallScreen ? 8 : 10,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: isSelected
+                          ? LinearGradient(
+                              colors: [
+                                _mint,
+                                _mint.withOpacity(0.8),
+                              ],
+                            )
+                          : null,
+                      color: isSelected ? null : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? _mint : Colors.grey[300]!,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: _mint.withOpacity(0.3),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      filter['label'] as String,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        fontSize: isSmallScreen ? 12 : 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   // Build appointments list for current user
   Widget _buildAppointmentsList() {
     final user = FirebaseAuth.instance.currentUser;
@@ -808,7 +908,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
         }
 
         // Sort appointments by appointmentDateTime in memory
-        final appointments = snapshot.data!.docs.toList()
+        var appointments = snapshot.data!.docs.toList()
           ..sort((a, b) {
             final aData = a.data() as Map<String, dynamic>;
             final bData = b.data() as Map<String, dynamic>;
@@ -824,6 +924,40 @@ class _AppointmentPageState extends State<AppointmentPage> {
 
             return aDate.compareTo(bDate);
           });
+
+        // Filter by status if a filter is selected
+        if (_selectedStatusFilter != null) {
+          appointments = appointments.where((doc) {
+            final appointment = doc.data() as Map<String, dynamic>;
+            final status = (appointment['status'] ?? 'pending').toString().toLowerCase();
+            return status == _selectedStatusFilter!.toLowerCase();
+          }).toList();
+        }
+
+        if (appointments.isEmpty && _selectedStatusFilter != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.filter_alt_off, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No ${_selectedStatusFilter} appointments found',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedStatusFilter = null;
+                    });
+                  },
+                  child: const Text('Clear filter'),
+                ),
+              ],
+            ),
+          );
+        }
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
@@ -1144,6 +1278,12 @@ class _AppointmentPageState extends State<AppointmentPage> {
             const Divider(height: 24),
             _buildRescheduleSection(appointment, appointmentId),
           ],
+
+          // Cancel button for pending appointments only
+          if (normalizedStatus == 'pending') ...[
+            const SizedBox(height: 12),
+            _buildCancelSection(appointmentId),
+          ],
         ],
       ),
     );
@@ -1184,6 +1324,175 @@ class _AppointmentPageState extends State<AppointmentPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildCancelSection(String appointmentId) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showCancelConfirmationDialog(appointmentId),
+        icon: const Icon(Icons.cancel, color: Colors.red),
+        label: const Text(
+          'Cancel Appointment',
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.red, width: 2),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCancelConfirmationDialog(String appointmentId) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Cancel Appointment',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'Are you sure you want to cancel this appointment? This action cannot be undone.',
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'No',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 14 : 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _cancelAppointment(appointmentId);
+              },
+              child: const Text(
+                'Yes, Cancel',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _cancelAppointment(String appointmentId) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please log in to cancel appointments'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Update appointment status to cancelled
+      await FirebaseFirestore.instance
+          .collection('user_appointments')
+          .doc(appointmentId)
+          .update({
+        'status': 'cancelled',
+        'cancelledAt': Timestamp.now(),
+        'cancelledBy': user.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Create or update notification for cancellation
+      await _createOrUpdateNotificationForCancellation(appointmentId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Appointment cancelled successfully'),
+            backgroundColor: _mint,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error cancelling appointment: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cancelling appointment: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _createOrUpdateNotificationForCancellation(String appointmentId) async {
+    try {
+      final appointmentDoc = await FirebaseFirestore.instance
+          .collection('user_appointments')
+          .doc(appointmentId)
+          .get();
+
+      if (!appointmentDoc.exists) {
+        return;
+      }
+
+      final appointmentData = appointmentDoc.data() as Map<String, dynamic>;
+      final vetId = appointmentData['vetId'] as String?;
+      final vetName = appointmentData['vetName'] as String?;
+      final petName = appointmentData['petName'] as String?;
+      final userName = appointmentData['userName'] as String?;
+      final userEmail = appointmentData['userEmail'] as String?;
+
+      if (vetId == null) {
+        return;
+      }
+
+      final notificationsRef = FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(appointmentId);
+
+      await notificationsRef.set({
+        'type': 'appointment_cancelled',
+        'appointmentId': appointmentId,
+        'vetId': vetId,
+        'vetName': vetName ?? 'Unknown Vet',
+        'userId': appointmentData['userId'],
+        'userName': userName ?? 'Unknown User',
+        'userEmail': userEmail ?? '',
+        'petName': petName ?? 'Unknown Pet',
+        'message': '${userName ?? "A user"} cancelled an appointment for ${petName ?? "their pet"}',
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Failed to create notification for cancellation: $e');
+    }
   }
 
   Widget _buildOnlineConsultationSection(String status, String? meetingLink) {
@@ -1305,6 +1614,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
         return _FeedbackForm(
           appointmentId: appointmentId,
           userName: appointment['userName'] ?? 'Unknown User',
+          vetId: appointment['vetId'] as String?,
           vetName: appointment['vetName'] ?? 'Unknown Vet',
         );
       },
@@ -2292,11 +2602,13 @@ class _AppointmentPageState extends State<AppointmentPage> {
 class _FeedbackForm extends StatefulWidget {
   final String appointmentId;
   final String userName;
+  final String? vetId;
   final String vetName;
 
   const _FeedbackForm({
     required this.appointmentId,
     required this.userName,
+    this.vetId,
     required this.vetName,
   });
 
@@ -2356,7 +2668,8 @@ class _FeedbackFormState extends State<_FeedbackForm> {
         'Name': _nameController.text.trim(),
         'Feedback': _feedbackController.text.trim(),
         'date': Timestamp.now(),
-        'vetName': widget.vetName,
+        'vetId': widget.vetId,
+        'vetName': widget.vetName, // Keep for display purposes
       });
 
       if (mounted) {
@@ -2532,18 +2845,18 @@ class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
   DateTime selectedDate = DateTime.now();
   String? selectedTime;
   
-  List<String> morningTimes = [
-    '8:00 - 9:00 AM',
-    '9:00 - 10:00 AM',
-    '10:00 - 11:00 AM',
-    '11:00 - 12:00 PM',
-  ];
-  List<String> afternoonTimes = [
-    '1:00 - 2:00 PM',
-    '2:00 - 3:00 PM',
-    '3:00 - 4:00 PM',
-    '4:00 - 5:00 PM',
-  ];
+  List<String> morningTimes = [];
+  List<String> afternoonTimes = [];
+  
+  Map<String, dynamic>? vetSchedule;
+  Map<String, dynamic>? vetAvailability;
+  bool _isLoadingSchedule = false;
+  List<String> workingDays = [];
+  Set<String> bookedTimeSlots = {};
+  
+  // Store all available dates and time slots from Firebase
+  Map<String, List<String>> availableDatesAndSlots = {}; // date -> list of available time slots
+  Set<String> allAvailableDates = {}; // Set of all dates that have at least one available slot
 
   @override
   void initState() {
@@ -2560,6 +2873,484 @@ class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
     
     // Initialize with current time slot
     selectedTime = widget.appointment['timeSlot'] as String?;
+    
+    // Load vet schedule and availability from Firebase
+    _loadVetSchedule();
+  }
+  
+  // Get vet ID from appointment
+  String? get _vetId {
+    return widget.appointment['vetId'] as String?;
+  }
+  
+  // Load vet schedule and availability from Firebase
+  Future<void> _loadVetSchedule() async {
+    if (_vetId == null) {
+      setState(() {
+        _isLoadingSchedule = false;
+        morningTimes = ['8:00 - 9:00 AM', '9:00 - 10:00 AM', '10:00 - 11:00 AM', '11:00 - 12:00 PM'];
+        afternoonTimes = ['1:00 - 2:00 PM', '2:00 - 3:00 PM', '3:00 - 4:00 PM', '4:00 - 5:00 PM'];
+      });
+      return;
+    }
+    
+    setState(() {
+      _isLoadingSchedule = true;
+    });
+
+    try {
+      final schedule = await _fetchVetSchedule(_vetId!);
+      var availability = await _fetchVetAvailability(_vetId!);
+      
+      // Extract all available dates and time slots from Firebase
+      final extractedData = _extractAvailableDatesAndSlots(availability);
+      
+      setState(() {
+        vetSchedule = schedule;
+        vetAvailability = availability;
+        availableDatesAndSlots = extractedData['datesAndSlots'] as Map<String, List<String>>;
+        allAvailableDates = extractedData['dates'] as Set<String>;
+        
+        // Get time slots from schedule, or use all available slots from Firebase
+        final allAvailableSlots = _getAllAvailableTimeSlots(availability);
+        if (allAvailableSlots.isNotEmpty) {
+          // Split into morning and afternoon based on hour
+          final morning = <String>[];
+          final afternoon = <String>[];
+          
+          for (var slot in allAvailableSlots) {
+            final hour = _getHourFromTimeSlot(slot);
+            if (hour >= 8 && hour < 12) {
+              morning.add(slot);
+            } else if (hour >= 12 && hour <= 18) {
+              afternoon.add(slot);
+            }
+          }
+          
+          morningTimes = morning.isNotEmpty ? morning : ['8:00', '9:00', '10:00', '11:00'];
+          afternoonTimes = afternoon.isNotEmpty ? afternoon : ['13:00', '14:00', '15:00', '16:00'];
+        } else {
+          morningTimes = ['8:00', '9:00', '10:00', '11:00'];
+          afternoonTimes = ['13:00', '14:00', '15:00', '16:00'];
+        }
+        
+        workingDays = _getWorkingDays(schedule);
+        _isLoadingSchedule = false;
+      });
+
+      _loadBookedTimeSlots();
+    } catch (e) {
+      debugPrint('Error loading vet schedule: $e');
+      setState(() {
+        morningTimes = ['8:00', '9:00', '10:00', '11:00'];
+        afternoonTimes = ['13:00', '14:00', '15:00', '16:00'];
+        workingDays = [];
+        _isLoadingSchedule = false;
+      });
+    }
+  }
+  
+  // Fetch vet schedule from Firebase (similar to book_appointment.dart)
+  Future<Map<String, dynamic>?> _fetchVetSchedule(String vetId) async {
+    try {
+      const int batchSize = 100;
+      List<QueryDocumentSnapshot> allDocs = [];
+      QueryDocumentSnapshot? lastDoc;
+      
+      while (true) {
+        Query query = FirebaseFirestore.instance
+            .collection('vet_schedules')
+            .where('vetId', isEqualTo: vetId)
+            .limit(batchSize);
+        
+        if (lastDoc != null) {
+          query = query.startAfterDocument(lastDoc);
+        }
+        
+        final querySnapshot = await query.get();
+        final batchDocs = querySnapshot.docs;
+        
+        if (batchDocs.isEmpty) break;
+        
+        allDocs.addAll(batchDocs);
+        
+        if (batchDocs.length < batchSize) break;
+        
+        lastDoc = batchDocs.last;
+      }
+      
+      if (allDocs.isNotEmpty) {
+        final scheduleData = <String, dynamic>{'vetId': vetId};
+        
+        for (var doc in allDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final date = data['date'] as String?;
+          
+          if (date != null && data.containsKey('timeSlots')) {
+            scheduleData[date] = data['timeSlots'];
+          }
+        }
+        
+        if (scheduleData.length > 1) {
+          return scheduleData;
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching vet schedule: $e');
+      return null;
+    }
+  }
+  
+  // Fetch vet availability from Firebase
+  Future<Map<String, dynamic>?> _fetchVetAvailability(String vetId) async {
+    try {
+      const int batchSize = 100;
+      List<QueryDocumentSnapshot> allDocs = [];
+      QueryDocumentSnapshot? lastDoc;
+      
+      while (true) {
+        Query query = FirebaseFirestore.instance
+            .collection('vet_schedules')
+            .where('vetId', isEqualTo: vetId)
+            .limit(batchSize);
+        
+        if (lastDoc != null) {
+          query = query.startAfterDocument(lastDoc);
+        }
+        
+        final querySnapshot = await query.get();
+        final batchDocs = querySnapshot.docs;
+        
+        if (batchDocs.isEmpty) break;
+        
+        allDocs.addAll(batchDocs);
+        
+        if (batchDocs.length < batchSize) break;
+        
+        lastDoc = batchDocs.last;
+      }
+      
+      if (allDocs.isNotEmpty) {
+        final availabilityData = <String, dynamic>{'vetId': vetId};
+        
+        for (var doc in allDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final date = data['date'] as String?;
+          
+          if (date != null && data.containsKey('timeSlots')) {
+            availabilityData[date] = data['timeSlots'];
+          }
+        }
+        
+        if (availabilityData.length > 1) {
+          return availabilityData;
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching vet availability: $e');
+      return null;
+    }
+  }
+  
+  // Extract available dates and slots from availability data
+  Map<String, dynamic> _extractAvailableDatesAndSlots(Map<String, dynamic>? availability) {
+    final datesAndSlots = <String, List<String>>{};
+    final dates = <String>{};
+    
+    if (availability == null) {
+      return {'datesAndSlots': datesAndSlots, 'dates': dates};
+    }
+    
+    final datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    
+    availability.forEach((key, value) {
+      if (datePattern.hasMatch(key) && value is Map) {
+        final availableSlots = <String>[];
+        final dateSlots = value;
+        
+        dateSlots.forEach((timeKey, timeValue) {
+          if (timeValue is bool && timeValue) {
+            final timeStr = timeKey.toString();
+            final normalizedTime = _normalizeTimeSlotFromRange(timeStr);
+            if (normalizedTime != null) {
+              if (!availableSlots.contains(normalizedTime)) {
+                availableSlots.add(normalizedTime);
+              }
+            }
+          }
+        });
+        
+        if (availableSlots.isNotEmpty) {
+          datesAndSlots[key] = availableSlots;
+          dates.add(key);
+        }
+      }
+    });
+    
+    return {'datesAndSlots': datesAndSlots, 'dates': dates};
+  }
+  
+  // Get all available time slots from availability
+  List<String> _getAllAvailableTimeSlots(Map<String, dynamic>? availability) {
+    final allSlots = <String>{};
+    
+    if (availability == null) return [];
+    
+    final datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    
+    availability.forEach((key, value) {
+      if (datePattern.hasMatch(key) && value is Map) {
+        final dateSlots = value;
+        
+        dateSlots.forEach((timeKey, timeValue) {
+          if (timeValue is bool && timeValue) {
+            final timeStr = timeKey.toString();
+            final normalizedTime = _normalizeTimeSlotFromRange(timeStr);
+            if (normalizedTime != null) {
+              allSlots.add(normalizedTime);
+            }
+          }
+        });
+      }
+    });
+    
+    final sortedSlots = allSlots.toList()..sort((a, b) {
+      final hourA = _getHourFromTimeSlot(a);
+      final minuteA = _getMinuteFromTimeSlot(a);
+      final hourB = _getHourFromTimeSlot(b);
+      final minuteB = _getMinuteFromTimeSlot(b);
+      
+      if (hourA != hourB) {
+        return hourA.compareTo(hourB);
+      }
+      return minuteA.compareTo(minuteB);
+    });
+    
+    return sortedSlots;
+  }
+  
+  // Normalize time slot from range format to HH:MM format
+  String? _normalizeTimeSlotFromRange(String timeStr) {
+    final trimmed = timeStr.trim();
+    
+    if (RegExp(r'^\d{2}:\d{2}$').hasMatch(trimmed)) {
+      return trimmed;
+    }
+    
+    final rangeMatch = RegExp(r'^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)?', caseSensitive: false).firstMatch(trimmed);
+    if (rangeMatch != null) {
+      final startHour = int.tryParse(rangeMatch.group(1) ?? '');
+      final startMinute = rangeMatch.group(2) ?? '00';
+      final endHour = int.tryParse(rangeMatch.group(3) ?? '');
+      final period = rangeMatch.group(5)?.toUpperCase();
+      
+      if (startHour != null && endHour != null) {
+        var hour24 = startHour;
+        
+        if (period == 'PM') {
+          if (startHour == 11 && endHour == 12) {
+            hour24 = 11;
+          } else {
+            if (startHour != 12) {
+              hour24 = startHour + 12;
+            } else {
+              hour24 = 12;
+            }
+          }
+        } else if (period == 'AM') {
+          if (startHour == 12) {
+            hour24 = 0;
+          } else {
+            hour24 = startHour;
+          }
+        }
+        
+        return '${hour24.toString().padLeft(2, '0')}:$startMinute';
+      }
+    }
+    
+    return null;
+  }
+  
+  // Get hour from time slot (format: "08:00")
+  int _getHourFromTimeSlot(String timeSlot) {
+    final timeMatch = RegExp(r'(\d{2}):(\d{2})').firstMatch(timeSlot);
+    if (timeMatch != null) {
+      return int.tryParse(timeMatch.group(1) ?? '') ?? 0;
+    }
+    return 0;
+  }
+  
+  // Get minute from time slot (format: "08:00")
+  int _getMinuteFromTimeSlot(String timeSlot) {
+    final timeMatch = RegExp(r'(\d{2}):(\d{2})').firstMatch(timeSlot);
+    if (timeMatch != null) {
+      return int.tryParse(timeMatch.group(2) ?? '') ?? 0;
+    }
+    return 0;
+  }
+  
+  // Get working days from schedule
+  List<String> _getWorkingDays(Map<String, dynamic>? schedule) {
+    if (schedule == null) return [];
+    
+    if (schedule.containsKey('workingDays') && schedule['workingDays'] is List) {
+      final days = schedule['workingDays'] as List;
+      return days.map((day) => day.toString()).toList();
+    }
+    
+    if (schedule.containsKey('days') && schedule['days'] is List) {
+      final days = schedule['days'] as List;
+      return days.map((day) => day.toString()).toList();
+    }
+    
+    return [];
+  }
+  
+  // Load booked time slots for selected date
+  Future<void> _loadBookedTimeSlots() async {
+    if (_vetId == null) return;
+    
+    try {
+      final startOfDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      final endOfDay = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 23, 59, 59);
+      
+      final appointments = await FirebaseFirestore.instance
+          .collection('user_appointments')
+          .where('vetId', isEqualTo: _vetId)
+          .where('appointmentDateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('appointmentDateTime', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+          .where('status', whereIn: ['pending', 'confirmed'])
+          .get();
+      
+      setState(() {
+        bookedTimeSlots = appointments.docs
+            .map((doc) => doc.data()['timeSlot'] as String? ?? '')
+            .where((slot) => slot.isNotEmpty)
+            .toSet();
+      });
+    } catch (e) {
+      debugPrint('Error loading booked time slots: $e');
+    }
+  }
+  
+  // Check if a date is selectable
+  bool _isDateSelectable(DateTime date) {
+    final today = DateTime.now();
+    final dateOnly = DateTime(date.year, date.month, date.day);
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    if (dateOnly.isBefore(todayOnly)) {
+      return false;
+    }
+    
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    
+    if (allAvailableDates.isNotEmpty) {
+      if (!allAvailableDates.contains(dateStr)) {
+        return false;
+      }
+      
+      if (availableDatesAndSlots.containsKey(dateStr)) {
+        final slots = availableDatesAndSlots[dateStr]!;
+        if (slots.isEmpty) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    } else {
+      if (workingDays.isNotEmpty) {
+        final dayName = DateFormat('EEEE').format(date);
+        if (!workingDays.contains(dayName)) {
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  }
+  
+  // Format time slot for display (convert 24-hour to 12-hour format with range)
+  // Format: "08:00" -> "8:00 - 9:00 AM"
+  String _formatTimeSlotForDisplay(String timeSlot) {
+    try {
+      // If already in display format (contains range), return as is
+      if (timeSlot.contains(' - ') && (timeSlot.contains('AM') || timeSlot.contains('PM') || timeSlot.contains('NN'))) {
+        return timeSlot;
+      }
+      
+      // Parse the time slot (format: "08:00" or "HH:MM")
+      final parts = timeSlot.split(':');
+      if (parts.length == 2) {
+        final hour = int.parse(parts[0]);
+        final minute = parts[1];
+        
+        // Calculate end time (1 hour later)
+        final endHour = (hour + 1) % 24;
+        
+        // Format start time
+        String startTime;
+        String startPeriod;
+        if (hour == 0) {
+          startTime = '12:$minute';
+          startPeriod = 'AM';
+        } else if (hour < 12) {
+          startTime = '$hour:$minute';
+          startPeriod = 'AM';
+        } else if (hour == 12) {
+          startTime = '12:$minute';
+          startPeriod = 'PM';
+        } else {
+          startTime = '${hour - 12}:$minute';
+          startPeriod = 'PM';
+        }
+        
+        // Format end time
+        String endTime;
+        String endPeriod;
+        if (endHour == 0) {
+          endTime = '12:$minute';
+          endPeriod = 'AM';
+        } else if (endHour < 12) {
+          endTime = '$endHour:$minute';
+          endPeriod = 'AM';
+        } else if (endHour == 12) {
+          endTime = '12:$minute';
+          endPeriod = 'NN'; // Use "NN" for noon instead of "PM"
+        } else {
+          endTime = '${endHour - 12}:$minute';
+          endPeriod = 'PM';
+        }
+        
+        // Special case: 11:00 - 12:00 PM should display as "11:00 - 12:00 NN"
+        if (hour == 11 && endHour == 12) {
+          return '$startTime - $endTime NN';
+        }
+        
+        // If both times are in the same period, only show period once
+        if (startPeriod == endPeriod) {
+          // If end period is NN, use NN instead
+          if (endPeriod == 'NN') {
+            return '$startTime - $endTime NN';
+          }
+          return '$startTime - $endTime $startPeriod';
+        } else {
+          // Crosses AM/PM boundary (e.g., 11:00 AM - 12:00 PM)
+          // If end is NN, format without AM on start
+          if (endPeriod == 'NN') {
+            return '$startTime - $endTime NN';
+          }
+          return '$startTime $startPeriod - $endTime $endPeriod';
+        }
+      }
+    } catch (e) {
+      // If parsing fails, return original
+    }
+    return timeSlot;
   }
 
   @override
@@ -2755,18 +3546,30 @@ class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
   }
 
   Widget _calendar() {
+    // Find first available date if current selected date is not selectable
+    DateTime initialDate = selectedDate;
+    if (!_isDateSelectable(selectedDate)) {
+      final today = DateTime.now();
+      for (int i = 0; i < 730; i++) {
+        final candidateDate = today.add(Duration(days: i));
+        if (_isDateSelectable(candidateDate)) {
+          initialDate = candidateDate;
+          break;
+        }
+      }
+    }
+    
     return CalendarDatePicker(
-      initialDate: selectedDate,
+      initialDate: initialDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 730)), // 2 years ahead
+      selectableDayPredicate: _isDateSelectable,
       onDateChanged: (date) {
         setState(() {
           selectedDate = date;
-          // Clear selected time if it becomes invalid (in the past) for the new date
-          if (selectedTime != null && _isTimeSlotInPast(selectedTime!)) {
-            selectedTime = null;
-          }
+          selectedTime = null; // Clear selected time when date changes
         });
+        _loadBookedTimeSlots(); // Reload booked slots for new date
       },
     );
   }
@@ -2778,51 +3581,98 @@ class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
     
     // Only check for past times if the selected date is today
     if (selectedDay.isAtSameMomentAs(today)) {
-      final timeParts = timeSlot.split(' ')[0].split(':');
-      final hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-      
-      bool isAM;
-      if (morningTimes.contains(timeSlot)) {
-        isAM = true;
-      } else if (afternoonTimes.contains(timeSlot)) {
-        isAM = false;
-      } else {
-        final hasAM = timeSlot.contains('AM');
-        final hasPM = timeSlot.contains('PM');
+      // Try to parse HH:MM format first
+      final timeMatch = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(timeSlot);
+      if (timeMatch != null) {
+        var hour = int.tryParse(timeMatch.group(1) ?? '') ?? 0;
+        final minute = int.tryParse(timeMatch.group(2) ?? '') ?? 0;
         
-        if (hasAM && !hasPM) {
-          isAM = true;
-        } else if (hasPM && !hasAM) {
-          isAM = hour == 12;
-        } else {
-          isAM = hour != 12;
+        // Check if it's AM/PM format
+        final hasAM = timeSlot.toUpperCase().contains('AM');
+        final hasPM = timeSlot.toUpperCase().contains('PM');
+        final hasNN = timeSlot.toUpperCase().contains('NN');
+        
+        if (hasPM && !hasAM && !hasNN) {
+          if (hour != 12) {
+            hour += 12;
+          }
+        } else if (hasAM && !hasPM) {
+          if (hour == 12) {
+            hour = 0;
+          }
+        } else if (hasNN) {
+          // NN is 12:00 PM
+          hour = 12;
         }
+        
+        final slotDateTime = DateTime(now.year, now.month, now.day, hour, minute);
+        return slotDateTime.isBefore(now);
       }
-      
-      int hour24 = hour;
-      if (!isAM && hour != 12) {
-        hour24 += 12;
-      } else if (isAM && hour == 12) {
-        hour24 = 0;
-      }
-      
-      final slotDateTime = DateTime(now.year, now.month, now.day, hour24, minute);
-      return slotDateTime.isBefore(now);
     }
     
     return false;
   }
 
   List<String> get availableMorningTimes {
-    return morningTimes.where((time) => !_isTimeSlotInPast(time)).toList();
+    final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final availableSlots = availableDatesAndSlots[dateStr] ?? [];
+    
+    // Filter morning slots (8:00-11:59) that are available and not booked
+    final morning = morningTimes.where((time) {
+      final normalizedTime = _normalizeTimeSlotFromRange(time) ?? time;
+      final hour = _getHourFromTimeSlot(normalizedTime);
+      if (hour >= 8 && hour < 12) {
+        // Check if it's in available slots for this date
+        if (availableSlots.contains(normalizedTime)) {
+          // Check if not booked
+          final displayTime = _formatTimeSlotForDisplay(time);
+          return !bookedTimeSlots.contains(displayTime) && !_isTimeSlotInPast(displayTime);
+        }
+      }
+      return false;
+    }).toList();
+    
+    // Format for display
+    return morning.map((time) => _formatTimeSlotForDisplay(time)).toList();
   }
 
   List<String> get availableAfternoonTimes {
-    return afternoonTimes.where((time) => !_isTimeSlotInPast(time)).toList();
+    final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final availableSlots = availableDatesAndSlots[dateStr] ?? [];
+    
+    // Filter afternoon slots (12:00-18:00) that are available and not booked
+    final afternoon = afternoonTimes.where((time) {
+      final normalizedTime = _normalizeTimeSlotFromRange(time) ?? time;
+      final hour = _getHourFromTimeSlot(normalizedTime);
+      if (hour >= 12 && hour <= 18) {
+        // Check if it's in available slots for this date
+        if (availableSlots.contains(normalizedTime)) {
+          // Check if not booked
+          final displayTime = _formatTimeSlotForDisplay(time);
+          return !bookedTimeSlots.contains(displayTime) && !_isTimeSlotInPast(displayTime);
+        }
+      }
+      return false;
+    }).toList();
+    
+    // Format for display
+    return afternoon.map((time) => _formatTimeSlotForDisplay(time)).toList();
   }
 
   Widget _buildTimeGrid() {
+    if (_isLoadingSchedule) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: _mint),
+        ),
+      );
+    }
+
     final morningSlots = availableMorningTimes;
     final afternoonSlots = availableAfternoonTimes;
     
@@ -2873,7 +3723,7 @@ class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
                     ),
                   ),
                   child: Text(
-                    time,
+                    _formatTimeSlotForDisplay(time),
                     style: TextStyle(
                       color: selected ? Colors.white : Colors.black87,
                       fontSize: 13,
@@ -2930,7 +3780,7 @@ class _RescheduleAppointmentPageState extends State<RescheduleAppointmentPage> {
                     ),
                   ),
                   child: Text(
-                    time,
+                    _formatTimeSlotForDisplay(time),
                     style: TextStyle(
                       color: selected ? Colors.white : Colors.black87,
                       fontSize: 13,

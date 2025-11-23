@@ -569,7 +569,6 @@ class _VetProfilePageState extends State<VetProfilePage> {
         final certificationsRaw = portfolio['certifications'];
         final educationRaw = portfolio['education'];
         final experienceRaw = portfolio['experience'];
-        final languagesRaw = portfolio['languages'];
         final membershipsRaw = portfolio['memberships'];
         final publicationsRaw = portfolio['publications'];
         
@@ -617,17 +616,6 @@ class _VetProfilePageState extends State<VetProfilePage> {
           }).toList();
         }
         
-        // Safely extract languages
-        List<String> languages = [];
-        if (languagesRaw is List) {
-          languages = languagesRaw.map((lang) {
-            if (lang is String) {
-              return lang;
-            }
-            return lang.toString();
-          }).toList();
-        }
-        
         // Safely extract memberships
         List<Map<String, dynamic>> memberships = [];
         if (membershipsRaw is List) {
@@ -656,7 +644,6 @@ class _VetProfilePageState extends State<VetProfilePage> {
             certifications.isEmpty &&
             education.isEmpty &&
             experience.isEmpty &&
-            languages.isEmpty &&
             memberships.isEmpty &&
             publications.isEmpty) {
           return const SizedBox.shrink();
@@ -737,17 +724,6 @@ class _VetProfilePageState extends State<VetProfilePage> {
                 const SizedBox(height: 12),
                 ...publications.map((pub) => _buildPublicationCard(pub)),
                 const SizedBox(height: 20),
-              ],
-              
-              // Languages Section (moved to bottom)
-              if (languages.isNotEmpty) ...[
-                _buildPortfolioSectionTitle('Languages'),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: languages.map((lang) => _buildLanguageChip(lang)).toList(),
-                ),
               ],
             ],
           ),
@@ -1071,35 +1047,6 @@ class _VetProfilePageState extends State<VetProfilePage> {
     );
   }
 
-  Widget _buildLanguageChip(String language) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: _mintLight,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _mint.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.language,
-            color: _mint,
-            size: 16,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            language,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: _mintDark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildMembershipCard(Map<String, dynamic> mem) {
     final role = mem['role'] as String? ?? '';
